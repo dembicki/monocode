@@ -10,11 +10,21 @@ import {
 import { createPortal } from "react-dom";
 import { fuzzyMatch } from "../lib/fuzzy";
 import { LAYER } from "../lib/layers";
-import { projectName } from "../lib/paths";
+import { projectKey, projectName } from "../lib/paths";
 import { projectSwitcherItems, type RecentProject } from "../lib/recents";
+import {
+  loadTabGroupColors,
+  loadTabGroupCustomColors,
+  loadTabGroupMascots,
+  resolveTabGroupColor,
+  resolveTabGroupLogo,
+  resolveTabGroupMascot,
+} from "../lib/tabGroups";
 import { useLockOverscroll } from "../hooks/useLockOverscroll";
+import { useTabGroupLogos } from "../hooks/useTabGroupLogos";
 import { MatchText } from "./MatchText";
 import { ProjectLogoIcon } from "./ProjectLogoIcon";
+import { ProjectMascot } from "./ProjectMascot";
 
 const MAX_RESULTS = 80;
 
@@ -30,6 +40,44 @@ type RankedProject = Candidate & {
 };
 
 type Row = { kind: "browse" } | ({ kind: "project" } & RankedProject);
+
+type ProjectMarks = {
+  logos: Record<string, string>;
+  colors: Record<string, number>;
+  customColors: Record<string, string>;
+  mascots: Record<string, string>;
+};
+
+/** The project's logo, or its mascot when it has none — as on the rail. */
+function ProjectMark({
+  path,
+  name,
+  logos,
+  colors,
+  customColors,
+  mascots,
+}: { path: string; name: string } & ProjectMarks) {
+  // `ProjectLogoIcon` takes the image file on disk, not the project folder.
+  const key = projectKey(path);
+  const logo = resolveTabGroupLogo(key, logos);
+  if (logo) {
+    return (
+      <ProjectLogoIcon
+        path={logo}
+        className="size-3.5 rounded-sm"
+        imageClassName="size-3.5"
+      />
+    );
+  }
+  return (
+    <ProjectMascot
+      project={name}
+      color={resolveTabGroupColor(key, colors, customColors, name)}
+      name={resolveTabGroupMascot(key, mascots)}
+      className="size-3.5"
+    />
+  );
+}
 
 type Props = {
   open: boolean;
@@ -220,6 +268,10 @@ function ProjectList({
   const activeRef = useRef<HTMLButtonElement>(null);
   const pointer = useRef({ x: Number.NaN, y: Number.NaN, allow: false });
   const fromPointer = useRef(false);
+  const groupLogos = useTabGroupLogos();
+  const [groupColors] = useState(loadTabGroupColors);
+  const [groupCustomColors] = useState(loadTabGroupCustomColors);
+  const [groupMascots] = useState(loadTabGroupMascots);
 
   useEffect(() => {
     pointer.current.allow = false;
@@ -283,8 +335,15 @@ function ProjectList({
               </>
             ) : (
               <>
-                <span className="shrink-0">
-                  <ProjectLogoIcon path={row.path} className="size-3.5" />
+                <span className="grid size-3.5 shrink-0 place-items-center">
+                  <ProjectMark
+                    path={row.path}
+                    name={row.name}
+                    logos={groupLogos}
+                    colors={groupColors}
+                    customColors={groupCustomColors}
+                    mascots={groupMascots}
+                  />
                 </span>
                 <span className="min-w-0 flex-1 truncate">
                   <MatchText
