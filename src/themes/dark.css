@@ -1,0 +1,10 @@
+/* The default theme. Keep its palette here so future themes can provide their
+   own token set without adding branches to the application shell. */
+html[data-theme="dark"]:not(.theme-light) {
+  --background-lightness: 8%;
+  --content-lightness: 91%;
+  --accent-color: #a879ff;
+  --link-color: #aebfff;
+  --color-mention: #a879ff;
+  --color-markdown-heading: #d5b8ff;
+}

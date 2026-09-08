@@ -1,6 +1,11 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { HAS_NATIVE_GLASS, IS_MAC } from "./platform";
 import { applyUiScale, loadUiScale } from "./uiScale";
+import {
+  DEFAULT_THEME_ID,
+  isThemeId,
+  type ThemeId,
+} from "../themes";
 
 const THEME_HUE_KEY = "monocode.themeHue";
 const THEME_SATURATION_KEY = "monocode.themeSaturation";
@@ -9,6 +14,7 @@ const BLUR_KEY = "monocode.sidebarBlur";
 const PROJECT_RAIL_OPEN_KEY = "monocode.projectRailOpen";
 const BODY_KEY = "monocode.bodyGlass";
 const SCHEME_KEY = "monocode.colorScheme";
+const THEME_STYLE_KEY = "monocode.themeStyle";
 const SIDEBAR_TAB_ORDER_KEY = "monocode.sidebarTabOrder";
 const PROJECT_RAIL_WIDTH_KEY = "monocode.projectRailWidth";
 const TRANSCRIPT_LAYOUT_KEY = "monocode.transcriptLayout";
@@ -25,11 +31,13 @@ export const CHAT_BACKGROUND_PATH_CHANGE_EVENT =
 
 export type ColorScheme = "dark" | "light";
 export type ThemePreference = ColorScheme | "system";
+export type ThemeStyle = ThemeId;
 export type TranscriptLayout = "full" | "chat";
 export type ChatBackgroundScope = "empty" | "all";
 export type ChangesView = "list" | "tree";
 
 export const THEME_PREFERENCE_DEFAULT: ThemePreference = "dark";
+export const THEME_STYLE_DEFAULT: ThemeStyle = DEFAULT_THEME_ID;
 
 /** Fired on `window` whenever the color scheme flips (detail: ColorScheme). */
 export const SCHEME_CHANGE_EVENT = "monocode:schemechange";
@@ -57,11 +65,13 @@ const DEFAULT_SIDEBAR_TAB_ORDER: SidebarTabId[] = [
 
 export const THEME_HUE_MIN = 0;
 export const THEME_HUE_MAX = 360;
-export const THEME_HUE_DEFAULT = 240;
+// A restrained violet gives the dark scheme the ink-and-amethyst character of
+// the reference while still leaving the tint controls fully user adjustable.
+export const THEME_HUE_DEFAULT = 252;
 
 export const THEME_SATURATION_MIN = 0;
 export const THEME_SATURATION_MAX = 100;
-export const THEME_SATURATION_DEFAULT = 0;
+export const THEME_SATURATION_DEFAULT = 16;
 
 export const SIDEBAR_OPACITY_MIN = 0.15;
 export const SIDEBAR_OPACITY_MAX = 1;
@@ -174,8 +184,12 @@ export function applyThemeTint(hue: number, saturation: number) {
 
 export function initAppearance() {
   document.documentElement.classList.toggle("is-mac", IS_MAC);
-  document.documentElement.classList.toggle("has-native-glass", HAS_NATIVE_GLASS);
+  document.documentElement.classList.toggle(
+    "has-native-glass",
+    HAS_NATIVE_GLASS,
+  );
   applyThemeTint(loadThemeHue(), loadThemeSaturation());
+  applyThemeStyle(loadThemeStyle());
   applyThemePreference(loadThemePreference());
   watchSystemColorScheme();
   applySidebarOpacity(loadSidebarOpacity());
@@ -185,6 +199,27 @@ export function initAppearance() {
   applyChatBackgroundOpacity(loadChatBackgroundOpacity());
   applyChatBackgroundScope(loadChatBackgroundScope());
   void applyUiScale(loadUiScale());
+}
+
+export function loadThemeStyle(): ThemeStyle {
+  try {
+    const raw = localStorage.getItem(THEME_STYLE_KEY);
+    return isThemeId(raw) ? raw : THEME_STYLE_DEFAULT;
+  } catch {
+    return THEME_STYLE_DEFAULT;
+  }
+}
+
+export function saveThemeStyle(value: ThemeStyle) {
+  try {
+    localStorage.setItem(THEME_STYLE_KEY, value);
+  } catch {
+    // private mode / quota
+  }
+}
+
+export function applyThemeStyle(value: ThemeStyle) {
+  document.documentElement.dataset.theme = value;
 }
 
 function isThemePreference(value: unknown): value is ThemePreference {

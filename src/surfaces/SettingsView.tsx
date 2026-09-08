@@ -2,6 +2,7 @@ import {
   ArrowDownCircle,
   Check,
   ImagePlus,
+  ChevronDown,
   Loader,
   RefreshCw,
   RotateCcw,
@@ -28,6 +29,7 @@ import {
   applyChatBackgroundScope,
   applyBodyGlass,
   applyThemePreference,
+  applyThemeStyle,
   applySidebarBlur,
   applySidebarOpacity,
   applyThemeTint,
@@ -38,11 +40,13 @@ import {
   CHAT_BACKGROUND_SCOPE_DEFAULT,
   THEME_PREFERENCE_DEFAULT,
   chatBackgroundSrc,
+  THEME_STYLE_DEFAULT,
   loadBodyGlass,
   loadChatBackgroundOpacity,
   loadChatBackgroundPath,
   loadChatBackgroundScope,
   loadThemePreference,
+  loadThemeStyle,
   loadSidebarBlur,
   loadSidebarOpacity,
   loadThemeHue,
@@ -54,6 +58,7 @@ import {
   saveChatBackgroundPath,
   saveChatBackgroundScope,
   saveThemePreference,
+  saveThemeStyle,
   saveSidebarBlur,
   saveSidebarOpacity,
   saveThemeHue,
@@ -75,8 +80,10 @@ import {
   THEME_SATURATION_MIN,
   type ThemePreference,
   type ChatBackgroundScope,
+  type ThemeStyle,
   type TranscriptLayout,
 } from "../lib/appearance";
+import { THEMES } from "../themes";
 import {
   pickAndSaveChatBackground,
   removeChatBackground,
@@ -801,6 +808,7 @@ function UpdateRow({
 type AppearanceSettings = ReturnType<typeof useAppearanceSettings>;
 
 function useAppearanceSettings() {
+  const [themeStyle, setThemeStyle] = useState<ThemeStyle>(loadThemeStyle);
   const [themePreference, setThemePreference] =
     useState<ThemePreference>(loadThemePreference);
   const [opacity, setOpacity] = useState(loadSidebarOpacity);
@@ -828,6 +836,12 @@ function useAppearanceSettings() {
     applyThemePreference(next);
     saveThemePreference(next);
     setThemePreference(next);
+  }, []);
+
+  const onThemeStyle = useCallback((next: ThemeStyle) => {
+    applyThemeStyle(next);
+    saveThemeStyle(next);
+    setThemeStyle(next);
   }, []);
 
   const onOpacity = useCallback((percent: number) => {
@@ -910,6 +924,7 @@ function useAppearanceSettings() {
   }, []);
 
   const restoreDefaults = useCallback(() => {
+    onThemeStyle(THEME_STYLE_DEFAULT);
     onThemePreference(THEME_PREFERENCE_DEFAULT);
     onOpacity(Math.round(SIDEBAR_OPACITY_DEFAULT * 100));
     onBlur(SIDEBAR_BLUR_DEFAULT);
@@ -927,12 +942,14 @@ function useAppearanceSettings() {
     onChatBackgroundScope,
     onClearChatBackground,
     onThemePreference,
+    onThemeStyle,
     onOpacity,
     onTint,
     onUiScale,
   ]);
 
   return {
+    themeStyle,
     themePreference,
     opacity,
     blur,
@@ -945,6 +962,7 @@ function useAppearanceSettings() {
     chatBackgroundBusy,
     chatBackgroundError,
     uiScale,
+    onThemeStyle,
     onThemePreference,
     onOpacity,
     onBlur,
@@ -967,10 +985,27 @@ function AppearancePage({ appearance }: { appearance: AppearanceSettings }) {
     <>
       <Row
         label="Theme"
-        description="System follows the OS appearance. Dark and light share the same tint, so the hue below applies to both."
+        description={
+          THEMES.find((theme) => theme.id === appearance.themeStyle)
+            ?.description
+        }
+      >
+        <Select
+          label="Theme"
+          value={appearance.themeStyle}
+          options={THEMES.map((theme) => ({
+            value: theme.id,
+            label: theme.label,
+          }))}
+          onChange={(value) => appearance.onThemeStyle(value as ThemeStyle)}
+        />
+      </Row>
+      <Row
+        label="Color scheme"
+        description="System follows the OS appearance. Hue and saturation apply to either scheme."
       >
         <Segmented
-          label="Theme"
+          label="Color scheme"
           value={appearance.themePreference}
           options={[
             { value: "system", label: "System" },
@@ -985,7 +1020,7 @@ function AppearancePage({ appearance }: { appearance: AppearanceSettings }) {
         description={
           glassDisabled
             ? "Light mode always uses an opaque window. Your dark-mode value is preserved."
-            : "How much of the desktop shows through the sidebar and the project rail."
+            : "How much of the desktop shows through the sidebar and project rail when using the Transparent theme."
         }
       >
         <Slider
@@ -1046,7 +1081,7 @@ function AppearancePage({ appearance }: { appearance: AppearanceSettings }) {
         description={
           glassDisabled
             ? "Main pane glass is unavailable while light mode uses an opaque window."
-            : "Extend the translucent treatment to the main pane behind sessions and editors."
+            : "Extend translucency to the main pane when using the Transparent theme."
         }
       >
         <Toggle
@@ -1780,18 +1815,29 @@ function Select({
   onChange: (value: string) => void;
 }) {
   return (
-    <select
-      aria-label={label}
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      className="max-w-52 rounded-md border border-content/10 bg-content/5 px-2 py-1 text-[12px] text-content outline-none hover:border-content/20"
-    >
-      {options.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
+    <span className="group relative inline-flex min-w-40 max-w-52 shrink-0 items-center">
+      <select
+        aria-label={label}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-8 w-full appearance-none rounded-lg border border-content/12 bg-background-base px-3 pr-9 text-[12px] font-medium text-content shadow-[0_1px_0_color-mix(in_srgb,var(--color-content)_5%,transparent),0_6px_18px_color-mix(in_srgb,black_18%,transparent)] outline-none transition-[border-color,background-color,box-shadow] hover:border-content/22 hover:bg-content/6 focus:border-accent/60 focus:bg-content/6 focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-accent)_14%,transparent)]"
+      >
+        {options.map((option) => (
+          <option
+            key={option.value}
+            value={option.value}
+            className="bg-background-base text-content"
+          >
+            {option.label}
+          </option>
+        ))}
+      </select>
+      <ChevronDown
+        aria-hidden
+        className="pointer-events-none absolute right-2.5 size-3.5 text-content/45 transition-colors group-hover:text-content/70"
+        strokeWidth={1.8}
+      />
+    </span>
   );
 }
 

@@ -1,0 +1,20 @@
+html.has-native-glass[data-theme="transparent"],
+html.has-native-glass[data-theme="transparent"] body,
+html.has-native-glass[data-theme="transparent"] #root {
+  background: transparent;
+}
+
+html.has-native-glass[data-theme="transparent"] .sidebar-glass {
+  background: hsl(
+    var(--theme-hue) var(--theme-saturation) var(--background-lightness) /
+      var(--sidebar-opacity)
+  );
+}
+
+html.has-native-glass[data-theme="transparent"].glass-body .body-glass {
+  background: color-mix(
+    in srgb,
+    var(--color-background-base) calc(var(--sidebar-opacity) * 100%),
+    transparent
+  );
+}
