@@ -9,6 +9,7 @@ import {
   looksLikeProject,
   projectRailItems,
   projectRailSections,
+  projectSwitcherItems,
   rememberProject,
   savePinnedProjects,
   saveProjectRailOrder,
@@ -124,6 +125,58 @@ describe("projectRailItems", () => {
         (item) => item.path,
       ),
     ).toEqual(["/tmp/app"]);
+  });
+});
+
+describe("projectSwitcherItems", () => {
+  beforeEach(() => {
+    mockLocalStorage();
+  });
+
+  it("puts a just-opened project first instead of last", () => {
+    // The rail appends newcomers, so a project the user just added sits in the
+    // last slot — off the bottom of the switcher once there are enough rows.
+    const recents = [
+      { path: "/tmp/brand-new", openedAt: 3 },
+      { path: "/tmp/beta", openedAt: 2 },
+      { path: "/tmp/alpha", openedAt: 1 },
+    ];
+    saveProjectRailOrder(["/tmp/alpha", "/tmp/beta", "/tmp/brand-new"]);
+
+    expect(
+      projectSwitcherItems(recents, "/tmp/alpha").map((item) => item.path),
+    ).toEqual(["/tmp/brand-new", "/tmp/beta"]);
+  });
+
+  it("ranks by recency rather than by pins or rail slots", () => {
+    const recents = [
+      { path: "/tmp/beta", openedAt: 3 },
+      { path: "/tmp/gamma", openedAt: 2 },
+      { path: "/tmp/alpha", openedAt: 1 },
+    ];
+    saveProjectRailOrder(["/tmp/gamma", "/tmp/beta", "/tmp/alpha"]);
+    savePinnedProjects(["/tmp/gamma"]);
+
+    expect(
+      projectSwitcherItems(recents, "/tmp/alpha").map((item) => item.path),
+    ).toEqual(["/tmp/beta", "/tmp/gamma"]);
+  });
+
+  it("keeps rail order for projects opened at the same moment", () => {
+    const recents = [
+      { path: "/tmp/beta", openedAt: 7 },
+      { path: "/tmp/gamma", openedAt: 7 },
+    ];
+    saveProjectRailOrder(["/tmp/gamma", "/tmp/beta"]);
+
+    expect(
+      projectSwitcherItems(recents, "/tmp/alpha").map((item) => item.path),
+    ).toEqual(["/tmp/gamma", "/tmp/beta"]);
+  });
+
+  it("leaves out the project that is already open", () => {
+    const recents = rememberProject("/tmp/alpha");
+    expect(projectSwitcherItems(recents, "/tmp/alpha/")).toEqual([]);
   });
 });
 

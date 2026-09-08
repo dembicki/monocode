@@ -11,11 +11,7 @@ import { createPortal } from "react-dom";
 import { fuzzyMatch } from "../lib/fuzzy";
 import { LAYER } from "../lib/layers";
 import { projectName } from "../lib/paths";
-import {
-  projectRailItems,
-  sameProjectPath,
-  type RecentProject,
-} from "../lib/recents";
+import { projectSwitcherItems, type RecentProject } from "../lib/recents";
 import { useLockOverscroll } from "../hooks/useLockOverscroll";
 import { MatchText } from "./MatchText";
 import { ProjectLogoIcon } from "./ProjectLogoIcon";
@@ -60,9 +56,10 @@ export function ProjectSwitcher({
 
   const candidates = useMemo<Candidate[]>(
     () =>
-      projectRailItems(recents, currentCwd)
-        .filter((entry) => !sameProjectPath(entry.path, currentCwd))
-        .map((entry) => ({ path: entry.path, name: projectName(entry.path) })),
+      projectSwitcherItems(recents, currentCwd).map((entry) => ({
+        path: entry.path,
+        name: projectName(entry.path),
+      })),
     [recents, currentCwd],
   );
 
