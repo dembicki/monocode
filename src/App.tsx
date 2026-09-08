@@ -16,8 +16,10 @@ import { ApprovalToasts } from "./chrome/ApprovalToasts";
 import { WhatsNewDialog } from "./chrome/WhatsNewDialog";
 import { TitleBar, type Tab as TitleTab } from "./chrome/TitleBar";
 import { MenuBar } from "./chrome/MenuBar";
+import { CommandPalette, type PaletteCommand } from "./chrome/CommandPalette";
 import { FilePicker } from "./chrome/FilePicker";
 import { SessionSwitcher } from "./chrome/SessionSwitcher";
+import { ProjectSwitcher } from "./chrome/ProjectSwitcher";
 import { UsageFooter } from "./chrome/UsageFooter";
 import { useProjectBranches } from "./hooks/useProjectBranches";
 import {
@@ -637,6 +639,8 @@ export default function App({
   const editorNavigationToken = useRef(0);
   const [filePickerOpen, setFilePickerOpen] = useState(false);
   const [sessionSwitcherOpen, setSessionSwitcherOpen] = useState(false);
+  const [projectSwitcherOpen, setProjectSwitcherOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [dirtyFiles, setDirtyFiles] = useState<Set<string>>(
     () => new Set(windowTransfer?.dirtyFileIds ?? []),
   );
@@ -690,6 +694,10 @@ export default function App({
   filePickerOpenRef.current = filePickerOpen;
   const sessionSwitcherOpenRef = useRef(sessionSwitcherOpen);
   sessionSwitcherOpenRef.current = sessionSwitcherOpen;
+  const projectSwitcherOpenRef = useRef(projectSwitcherOpen);
+  projectSwitcherOpenRef.current = projectSwitcherOpen;
+  const commandPaletteOpenRef = useRef(commandPaletteOpen);
+  commandPaletteOpenRef.current = commandPaletteOpen;
   const whatsNewVersionRef = useRef(whatsNewVersion);
   whatsNewVersionRef.current = whatsNewVersion;
 
@@ -4588,6 +4596,8 @@ export default function App({
     setInboxViewOpen(false);
     setNotesViewOpen(false);
     setSessionSwitcherOpen(false);
+    setProjectSwitcherOpen(false);
+    setCommandPaletteOpen(false);
     setFilePickerOpen(true);
   }, []);
 
@@ -4596,13 +4606,38 @@ export default function App({
     setInboxViewOpen(false);
     setNotesViewOpen(false);
     setFilePickerOpen(false);
+    setProjectSwitcherOpen(false);
+    setCommandPaletteOpen(false);
     setSessionSwitcherOpen(true);
+  }, []);
+
+  const onProjectSwitcher = useCallback(() => {
+    setSearchViewOpen(false);
+    setInboxViewOpen(false);
+    setNotesViewOpen(false);
+    setFilePickerOpen(false);
+    setSessionSwitcherOpen(false);
+    setCommandPaletteOpen(false);
+    setProjectSwitcherOpen(true);
+  }, []);
+
+  const onOpenCommandPalette = useCallback(() => {
+    setSearchViewOpen(false);
+    setInboxViewOpen(false);
+    setNotesViewOpen(false);
+    setFilePickerOpen(false);
+    setSessionSwitcherOpen(false);
+    setProjectSwitcherOpen(false);
+    setSettingsOpen(false);
+    setCommandPaletteOpen(true);
   }, []);
 
   const onFindInProject = useCallback(() => {
     setSearchViewOpen(false);
     setInboxViewOpen(false);
     setNotesViewOpen(false);
+    setProjectSwitcherOpen(false);
+    setCommandPaletteOpen(false);
     setSidebarTab("files");
     setFilesSearchOpen(true);
     setSearchFocusToken((token) => token + 1);
@@ -4611,9 +4646,11 @@ export default function App({
   const onOpenSearch = useCallback(() => {
     setFilePickerOpen(false);
     setSessionSwitcherOpen(false);
+    setProjectSwitcherOpen(false);
     setSettingsOpen(false);
     setInboxViewOpen(false);
     setNotesViewOpen(false);
+    setCommandPaletteOpen(false);
     setSearchViewOpen(true);
     setSearchViewFocusToken((token) => token + 1);
   }, []);
@@ -4625,9 +4662,11 @@ export default function App({
   const onOpenInbox = useCallback(() => {
     setFilePickerOpen(false);
     setSessionSwitcherOpen(false);
+    setProjectSwitcherOpen(false);
     setSettingsOpen(false);
     setSearchViewOpen(false);
     setNotesViewOpen(false);
+    setCommandPaletteOpen(false);
     setInboxViewOpen(true);
   }, []);
 
@@ -4639,9 +4678,11 @@ export default function App({
     if (!loadNotesEnabled()) return;
     setFilePickerOpen(false);
     setSessionSwitcherOpen(false);
+    setProjectSwitcherOpen(false);
     setSettingsOpen(false);
     setSearchViewOpen(false);
     setInboxViewOpen(false);
+    setCommandPaletteOpen(false);
     setNotesViewOpen(true);
   }, []);
 
@@ -4652,9 +4693,11 @@ export default function App({
   const openSettings = useCallback((section?: SettingsSectionId) => {
     setFilePickerOpen(false);
     setSessionSwitcherOpen(false);
+    setProjectSwitcherOpen(false);
     setSearchViewOpen(false);
     setInboxViewOpen(false);
     setNotesViewOpen(false);
+    setCommandPaletteOpen(false);
     if (section) {
       setSettingsSection(section);
       saveSettingsSection(section);
@@ -4792,6 +4835,8 @@ export default function App({
     onToggleSidebar,
     onGoToFile,
     onSessionSwitcher,
+    onProjectSwitcher,
+    onOpenCommandPalette,
     onFindInProject,
     onOpenSearch,
     onOpenInbox,
@@ -4820,6 +4865,8 @@ export default function App({
     onToggleSidebar,
     onGoToFile,
     onSessionSwitcher,
+    onProjectSwitcher,
+    onOpenCommandPalette,
     onFindInProject,
     onOpenSearch,
     onOpenInbox,
@@ -4833,6 +4880,131 @@ export default function App({
     openSettings,
     onOpenApprovalSession,
   };
+
+  const MOD = IS_MAC ? "⌘" : "Ctrl+";
+  const paletteCommands = useMemo<PaletteCommand[]>(
+    () => [
+      { id: "go_to_file", label: "Go to File…", shortcut: `${MOD}F`, run: onGoToFile },
+      {
+        id: "session_switcher",
+        label: "Switch Session…",
+        shortcut: `${MOD}P`,
+        run: onSessionSwitcher,
+      },
+      {
+        id: "open_search",
+        label: "Search…",
+        shortcut: `${MOD}K`,
+        run: onOpenSearch,
+      },
+      {
+        id: "find_in_project",
+        label: "Find in Files…",
+        shortcut: `${MOD}⇧F`,
+        run: onFindInProject,
+      },
+      {
+        id: "project_switcher",
+        label: "Switch Project…",
+        shortcut: `${MOD}O`,
+        run: onProjectSwitcher,
+      },
+      {
+        id: "open_project",
+        label: "Open Project…",
+        run: () => void pickProject(),
+      },
+      {
+        id: "toggle_sidebar",
+        label: "Toggle Sidebar",
+        shortcut: `${MOD}B`,
+        run: onToggleSidebar,
+      },
+      { id: "open_inbox", label: "Inbox", run: onOpenInbox },
+      ...(loadNotesEnabled()
+        ? [{ id: "open_notes", label: "Notes", run: onOpenNotes }]
+        : []),
+      {
+        id: "new_tab",
+        label: "New Tab",
+        shortcut: `${MOD}T`,
+        run: onNew,
+      },
+      {
+        id: "new_terminal",
+        label: "New Terminal",
+        shortcut: `${MOD}\``,
+        run: onNewTerminal,
+      },
+      {
+        id: "new_terminal_tab",
+        label: "New Terminal Tab",
+        shortcut: `${MOD}⇧\``,
+        run: onNewTerminalTab,
+      },
+      {
+        id: "toggle_terminal",
+        label: "Toggle Terminal",
+        shortcut: `${MOD}J`,
+        run: onToggleProjectTerminal,
+      },
+      {
+        id: "split_right",
+        label: "Split Pane Right",
+        shortcut: `${MOD}D`,
+        run: () => onSplit("right"),
+      },
+      {
+        id: "split_down",
+        label: "Split Pane Down",
+        shortcut: `${MOD}⇧D`,
+        run: () => onSplit("down"),
+      },
+      {
+        id: "close_tab",
+        label: "Close Pane",
+        shortcut: `${MOD}W`,
+        run: onClosePane,
+      },
+      {
+        id: "close_other_tabs",
+        label: "Close Other Tabs",
+        run: onCloseOtherTabs,
+      },
+      {
+        id: "open_model_picker",
+        label: "Switch Model…",
+        shortcut: `${MOD}.`,
+        run: () => window.dispatchEvent(new Event("open_model_picker")),
+      },
+      {
+        id: "open_settings",
+        label: "Settings…",
+        shortcut: `${MOD},`,
+        run: () => openSettings(),
+      },
+    ],
+    [
+      MOD,
+      onGoToFile,
+      onSessionSwitcher,
+      onProjectSwitcher,
+      onOpenSearch,
+      onFindInProject,
+      pickProject,
+      onToggleSidebar,
+      onOpenInbox,
+      onOpenNotes,
+      onNew,
+      onNewTerminal,
+      onNewTerminalTab,
+      onToggleProjectTerminal,
+      onSplit,
+      onClosePane,
+      onCloseOtherTabs,
+      openSettings,
+    ],
+  );
 
   const debounce = useRef({ name: "", at: 0 });
   const run = useCallback((name: string, fn: () => void) => {
@@ -4880,7 +5052,7 @@ export default function App({
         if (listNavigation) {
           const blockedTarget = Boolean(
             target?.closest(
-              'input, textarea, select, [contenteditable="true"], .cm-editor, .monocode-terminal, [role="dialog"], [data-model-picker], [data-file-picker], [data-branch-picker], [data-skill-picker], [data-mention-picker], [data-app-search]',
+              'input, textarea, select, [contenteditable="true"], .cm-editor, .monocode-terminal, [role="dialog"], [data-model-picker], [data-file-picker], [data-branch-picker], [data-skill-picker], [data-mention-picker], [data-app-search], [data-command-palette]',
             ),
           );
           const emptyComposerTarget = Boolean(
@@ -4892,6 +5064,9 @@ export default function App({
             notesViewOpenRef.current ||
             settingsOpenRef.current ||
             filePickerOpenRef.current ||
+            sessionSwitcherOpenRef.current ||
+            projectSwitcherOpenRef.current ||
+            commandPaletteOpenRef.current ||
             Boolean(whatsNewVersionRef.current);
           if (
             !shouldHandleListNavigation({
@@ -4922,7 +5097,7 @@ export default function App({
         const inPicker =
           target &&
           target.closest(
-            "[data-model-picker], [data-file-picker], [data-branch-picker], [data-skill-picker], [data-mention-picker], [data-app-search]",
+            "[data-model-picker], [data-file-picker], [data-branch-picker], [data-skill-picker], [data-mention-picker], [data-app-search], [data-command-palette]",
           );
         if (inPicker && typeof cmd === "object" && "activate" in cmd) {
           return;
@@ -4991,10 +5166,22 @@ export default function App({
         run("session_switcher", actions.current.onSessionSwitcher);
         return;
       }
+      if (mod && e.shiftKey && !e.altKey && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        e.stopPropagation();
+        run("command_palette", actions.current.onOpenCommandPalette);
+        return;
+      }
       if (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "f") {
         e.preventDefault();
         e.stopPropagation();
         run("go_to_file", actions.current.onGoToFile);
+        return;
+      }
+      if (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "o") {
+        e.preventDefault();
+        e.stopPropagation();
+        run("project_switcher", actions.current.onProjectSwitcher);
         return;
       }
       if (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "k") {
@@ -5071,6 +5258,10 @@ export default function App({
       }),
       listen("go_to_file", () => actions.current.onGoToFile()),
       listen("session_switcher", () => actions.current.onSessionSwitcher()),
+      listen("project_switcher", () => actions.current.onProjectSwitcher()),
+      listen("command_palette", () =>
+        actions.current.onOpenCommandPalette(),
+      ),
       listen("open_search", () => actions.current.onOpenSearch()),
       listen("open_inbox", () => actions.current.onOpenInbox()),
       listen("open_notes", () => actions.current.onOpenNotes()),
@@ -5290,6 +5481,7 @@ export default function App({
               onToggleTerminal={onToggleProjectTerminal}
               onGoToFile={onGoToFile}
               onSessionSwitcher={onSessionSwitcher}
+              onProjectSwitcher={onProjectSwitcher}
               onToggleSidebar={onToggleSidebar}
               onShowSourceControl={onToggleChanges}
               onCloseCurrentTab={
@@ -5546,6 +5738,25 @@ export default function App({
           activeSessionId={activeSessionId}
           onSelectSession={onSelectHistorySession}
           onClose={() => setSessionSwitcherOpen(false)}
+        />
+      ) : null}
+
+      {projectSwitcherOpen ? (
+        <ProjectSwitcher
+          open
+          recents={recents}
+          currentCwd={projectCwd}
+          onSelectProject={onSelectProject}
+          onBrowseFolder={() => void pickProject()}
+          onClose={() => setProjectSwitcherOpen(false)}
+        />
+      ) : null}
+
+      {commandPaletteOpen ? (
+        <CommandPalette
+          open
+          commands={paletteCommands}
+          onClose={() => setCommandPaletteOpen(false)}
         />
       ) : null}
 

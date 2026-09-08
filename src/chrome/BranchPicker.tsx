@@ -257,6 +257,16 @@ export function BranchPicker({
       if (!e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
       if (e.key.toLowerCase() !== "b") return;
       if (!interactive || blocked) return;
+      if (!open) {
+        const target = e.target instanceof Element ? e.target : null;
+        if (
+          target?.closest(
+            ".monocode-terminal, [data-file-picker], [data-session-switcher], [data-project-switcher], [data-model-picker], [data-skill-picker], [data-mention-picker], [data-access-picker], [data-model-settings]",
+          )
+        ) {
+          return;
+        }
+      }
       e.preventDefault();
       e.stopPropagation();
       if (open) dismiss(true);

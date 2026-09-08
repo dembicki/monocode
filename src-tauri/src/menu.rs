@@ -20,10 +20,10 @@ pub fn dispatch(app: &AppHandle, id: &str) {
         "new_tab" | "close_tab" | "close_other_tabs" | "next_tab" | "prev_tab" | "back_tab"
         | "forward_tab" | "split_right" | "split_down" | "focus_left" | "focus_right"
         | "focus_up" | "focus_down" | "toggle_sidebar" | "sidebar_opacity" | "open_project"
-        | "go_to_file" | "session_switcher" | "open_search" | "open_inbox" | "open_notes"
-        | "find_in_project"
-        | "find" | "new_terminal" | "new_terminal_tab" | "toggle_terminal"
-        | "open_model_picker" | "open_settings" | "check_for_updates" => {
+        | "project_switcher" | "go_to_file" | "session_switcher" | "command_palette"
+        | "open_search" | "open_inbox" | "open_notes" | "find_in_project" | "find"
+        | "new_terminal" | "new_terminal_tab" | "toggle_terminal" | "open_model_picker"
+        | "open_settings" | "check_for_updates" => {
             let _ = app.emit(id, ());
         }
         "zoom_in" | "zoom_out" | "zoom_reset" => {
@@ -63,7 +63,8 @@ fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let new_window = MenuItemBuilder::with_id("new_window", "New Window")
         .accelerator("CmdOrCtrl+Shift+N")
         .build(app)?;
-    let open_project = MenuItemBuilder::with_id("open_project", "Open Project…")
+    let open_project = MenuItemBuilder::with_id("open_project", "Open Project…").build(app)?;
+    let project_switcher = MenuItemBuilder::with_id("project_switcher", "Switch Project…")
         .accelerator("CmdOrCtrl+O")
         .build(app)?;
     let go_to_file = MenuItemBuilder::with_id("go_to_file", "Go to File…")
@@ -71,6 +72,9 @@ fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .build(app)?;
     let session_switcher = MenuItemBuilder::with_id("session_switcher", "Switch Session…")
         .accelerator("CmdOrCtrl+P")
+        .build(app)?;
+    let command_palette = MenuItemBuilder::with_id("command_palette", "Command Palette…")
+        .accelerator("CmdOrCtrl+Shift+P")
         .build(app)?;
     let open_search = MenuItemBuilder::with_id("open_search", "Search…")
         .accelerator("CmdOrCtrl+K")
@@ -152,9 +156,11 @@ fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let file = SubmenuBuilder::new(app, "File")
         .item(&new_window)
         .item(&open_project)
+        .item(&project_switcher)
         .item(&open_search)
         .item(&go_to_file)
         .item(&session_switcher)
+        .item(&command_palette)
         .item(&find_in_project)
         .separator()
         .item(&new_tab)

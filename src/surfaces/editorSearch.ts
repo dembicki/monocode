@@ -37,7 +37,7 @@ export function handleEditorFindKey(event: KeyboardEvent): boolean {
   const target = event.target instanceof Element ? event.target : null;
   if (
     target?.closest(
-      "[data-file-picker], [data-session-switcher], [data-model-picker], [data-branch-picker], [data-skill-picker], [data-mention-picker]",
+      "[data-file-picker], [data-session-switcher], [data-project-switcher], [data-model-picker], [data-branch-picker], [data-skill-picker], [data-mention-picker]",
     )
   ) {
     return false;
