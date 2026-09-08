@@ -42,8 +42,6 @@ import {
   gitDiffIndex,
   gitDiscardAll,
   gitDiscardFile,
-  gitPrCreate,
-  gitPrStatus,
   gitPush,
   gitStageAll,
   gitStageFile,
@@ -56,7 +54,6 @@ import {
   type GitDiffIndex,
   type GitFileDiffKind,
   type GitHistoryCommit,
-  type GitPr,
 } from "../lib/fs";
 import type { HarnessId } from "../lib/session";
 import {
@@ -64,7 +61,12 @@ import {
   saveChangesView,
   type ChangesView,
 } from "../lib/appearance";
-import { generateCommitMessage, generatePrContent } from "../lib/harness";
+import { generateCommitMessage } from "../lib/harness";
+import {
+  createAndOpenPullRequest,
+  prCreateBlocker,
+} from "../lib/pullRequest";
+import { refreshPrStatus, usePrStatus } from "../hooks/usePrStatus";
 import { invalidateWatchedFiles } from "../lib/fileWatch";
 import { MOD } from "../lib/platform";
 import { applyProjectDiffStats } from "../hooks/useProjectDiffStats";
@@ -87,7 +89,6 @@ let changesView: ChangesView = loadChangesView();
 /** Folders the user collapsed in tree view, keyed `<kind>:<dir>`. */
 const collapsedDirs = new Set<string>();
 const indexByCwd = new Map<string, GitDiffIndex>();
-const prByCwd = new Map<string, GitPr | null>();
 
 type Props = {
   cwd: string;
@@ -259,7 +260,8 @@ function ChangedFiles({
   const [stagedExpanded, setStagedExpanded] = useState(stagedOpen);
   const [changesExpanded, setChangesExpanded] = useState(changesOpen);
   const [view, setView] = useState<ChangesView>(changesView);
-  const { pr, reload: reloadPr } = usePrStatus(cwd, index?.branch);
+  const { pr } = usePrStatus(cwd, Boolean(index?.branch));
+  const reloadPr = useCallback(() => refreshPrStatus(cwd), [cwd]);
   const staged = useMemo(() => files.filter((file) => file.staged), [files]);
   const unstaged = useMemo(
     () => files.filter((file) => file.unstaged),
@@ -275,13 +277,7 @@ function ChangedFiles({
   const canGenerate = files.length > 0 && !busy;
   const canCommit = staged.length > 0 && message.trim().length > 0 && !busy;
   const canCreatePr =
-    hasRemote &&
-    !hasOpenPr &&
-    !onDefault &&
-    !diverged &&
-    files.length === 0 &&
-    (index?.aheadOfDefault ?? 0) > 0 &&
-    (index?.behind ?? 0) === 0;
+    index != null && !hasOpenPr && prCreateBlocker(index) === null;
   const canViewPr = hasOpenPr && !!pr?.url;
   const canPublish = hasRemote && !index?.upstream;
   const canSync =
@@ -445,16 +441,7 @@ function ChangedFiles({
   };
 
   const openCreatedPr = async () => {
-    const content = await generatePrContent(cwd, textHarness);
-    if (!content) throw new Error("Could not prepare pull request content");
-    const url = await gitPrCreate(
-      cwd,
-      content.title,
-      content.body,
-      content.base,
-      content.head,
-    );
-    await openUrl(url.trim());
+    await createAndOpenPullRequest(cwd, textHarness);
   };
 
   const createPr = async () => {
@@ -672,53 +659,6 @@ function ChangedFiles({
       </div>
     </aside>
   );
-}
-
-function usePrStatus(
-  cwd: string,
-  branch: string | null | undefined,
-): { pr: GitPr | null; reload: () => void } {
-  const [pr, setPr] = useState<GitPr | null>(() => cachedPr(cwd, branch));
-  const [nonce, setNonce] = useState(0);
-  const reload = useCallback(() => setNonce((value) => value + 1), []);
-
-  useEffect(() => {
-    if (!cwd || cwd === "~" || !branch) {
-      setPr(null);
-      return;
-    }
-    let cancelled = false;
-    const load = () => {
-      void gitPrStatus(cwd)
-        .then((next) => {
-          if (cancelled) return;
-          prByCwd.set(cwd, next);
-          setPr(next);
-        })
-        .catch(() => {
-          if (cancelled) return;
-          prByCwd.set(cwd, null);
-          setPr(null);
-        });
-    };
-    load();
-    const onResume = () => load();
-    window.addEventListener("focus", onResume);
-    return () => {
-      cancelled = true;
-      window.removeEventListener("focus", onResume);
-    };
-  }, [branch, cwd, nonce]);
-
-  return { pr, reload };
-}
-
-function cachedPr(
-  cwd: string,
-  branch: string | null | undefined,
-): GitPr | null {
-  if (!cwd || cwd === "~" || !branch) return null;
-  return prByCwd.get(cwd) ?? null;
 }
 
 function syncStatusLabel(index: GitDiffIndex): string {

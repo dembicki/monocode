@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ask, message } from "@tauri-apps/plugin-dialog";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   useCallback,
   useEffect,
@@ -22,6 +23,13 @@ import { SessionSwitcher } from "./chrome/SessionSwitcher";
 import { ProjectSwitcher } from "./chrome/ProjectSwitcher";
 import { UsageFooter } from "./chrome/UsageFooter";
 import { useProjectBranches } from "./hooks/useProjectBranches";
+import { usePrStatus } from "./hooks/usePrStatus";
+import {
+  createAndOpenPullRequest,
+  describePrCreate,
+  palettePrCommand,
+  prCreateBlocker,
+} from "./lib/pullRequest";
 import {
   loadProjectRailOpen,
   loadSidebarTabOrder,
@@ -925,6 +933,13 @@ export default function App({
     Boolean(sidebarCwd) && sidebarCwd !== "~",
   );
   const isGitRepo = Boolean(projectBranches);
+  // Shared with the git sidebar, so the palette's PR entry costs no extra
+  // `gh` lookup when both are alive.
+  const { pr: projectPr, settled: prSettled } = usePrStatus(
+    gitCwd,
+    isGitRepo,
+  );
+  const prPalette = palettePrCommand(projectPr, prSettled);
 
   const nextBusySessionIds = useMemo(() => {
     const ids = new Set<string>();
@@ -5051,6 +5066,41 @@ export default function App({
                 },
               },
             },
+            ...(prPalette.kind === "open"
+              ? [
+                  {
+                    id: "git_open_pr",
+                    label: `Open Pull Request #${prPalette.pr.number}`,
+                    run: () => void openUrl(prPalette.pr.url),
+                  },
+                ]
+              : prPalette.kind === "create"
+                ? [
+                    {
+                      id: "git_create_pr",
+                      label: "Create Pull Request",
+                      confirm: {
+                        confirmLabel: "Create",
+                        describe: async () =>
+                          describePrCreate(
+                            await gitDiffIndex(gitCwdRef.current),
+                          ),
+                        onConfirm: async () => {
+                          const cwd = gitCwdRef.current;
+                          const index = await gitDiffIndex(cwd);
+                          const blocker = prCreateBlocker(index);
+                          if (blocker) throw new Error(blocker);
+                          if (index.ahead > 0) await gitPush(cwd);
+                          await createAndOpenPullRequest(
+                            cwd,
+                            pickTextHarness(active?.harness),
+                          );
+                          notifyGitChanged();
+                        },
+                      },
+                    },
+                  ]
+                : []),
           ]
         : []),
   ];
