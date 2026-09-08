@@ -216,6 +216,7 @@ pub fn run() {
             fs::git_discard_file,
             fs::git_discard_all,
             fs::git_stage_all,
+            fs::git_stage_tracked,
             fs::git_unstage_all,
             fs::git_commit,
             fs::git_staged_context,

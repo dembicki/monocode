@@ -42,6 +42,10 @@ import { runUpdateFlow } from "./lib/updater";
 import { displayAttachments, prepareAttachments } from "./lib/attachments";
 import {
   basename,
+  gitCommit,
+  gitDiffIndex,
+  gitPush,
+  gitStageTracked,
   notifyGitChanged,
   pickFolder,
   restoreSessionCheckout,
@@ -920,6 +924,7 @@ export default function App({
     sidebarCwd,
     Boolean(sidebarCwd) && sidebarCwd !== "~",
   );
+  const isGitRepo = Boolean(projectBranches);
 
   const nextBusySessionIds = useMemo(() => {
     const ids = new Set<string>();
@@ -4882,8 +4887,11 @@ export default function App({
   };
 
   const MOD = IS_MAC ? "⌘" : "Ctrl+";
-  const paletteCommands = useMemo<PaletteCommand[]>(
-    () => [
+  // Rebuilt every render (not memoized): it's a short array of cheap object
+  // literals, and memoizing it previously meant `loadNotesEnabled()` only got
+  // re-read when an unrelated dependency changed, showing a stale "Notes"
+  // entry after toggling the setting mid-session.
+  const paletteCommands: PaletteCommand[] = [
       { id: "go_to_file", label: "Go to File…", shortcut: `${MOD}F`, run: onGoToFile },
       {
         id: "session_switcher",
@@ -4983,28 +4991,69 @@ export default function App({
         shortcut: `${MOD},`,
         run: () => openSettings(),
       },
-    ],
-    [
-      MOD,
-      onGoToFile,
-      onSessionSwitcher,
-      onProjectSwitcher,
-      onOpenSearch,
-      onFindInProject,
-      pickProject,
-      onToggleSidebar,
-      onOpenInbox,
-      onOpenNotes,
-      onNew,
-      onNewTerminal,
-      onNewTerminalTab,
-      onToggleProjectTerminal,
-      onSplit,
-      onClosePane,
-      onCloseOtherTabs,
-      openSettings,
-    ],
-  );
+      ...(isGitRepo
+        ? [
+            {
+              id: "git_view_diff",
+              label: "Git: View Diff",
+              run: () => {
+                setTabs((prev) =>
+                  prev.map((t) =>
+                    t.id === activeTabId
+                      ? openChangesTab(t, gitCwdRef.current, undefined)
+                      : t,
+                  ),
+                );
+              },
+            },
+            {
+              id: "git_add",
+              label: "Git: Add",
+              run: () => {
+                void gitStageTracked(gitCwdRef.current)
+                  .then(() => notifyGitChanged())
+                  .catch((err) =>
+                    window.alert(
+                      err instanceof Error ? err.message : String(err),
+                    ),
+                  );
+              },
+            },
+            {
+              id: "git_commit",
+              label: "Git: Commit…",
+              prompt: {
+                placeholder: "Commit message",
+                submitLabel: "Commit",
+                onSubmit: async (message: string) => {
+                  await gitCommit(gitCwdRef.current, message);
+                  notifyGitChanged();
+                },
+              },
+            },
+            {
+              id: "git_push",
+              label: "Git: Push",
+              confirm: {
+                confirmLabel: "Push",
+                describe: async () => {
+                  const index = await gitDiffIndex(gitCwdRef.current);
+                  const branch = index.branch ?? "HEAD";
+                  const remote = index.upstream ?? index.remote ?? "the remote";
+                  if (index.ahead <= 0) {
+                    return `${branch} has no new commits to push to ${remote}.`;
+                  }
+                  return `Push ${index.ahead} commit${index.ahead === 1 ? "" : "s"} from ${branch} to ${remote}?`;
+                },
+                onConfirm: async () => {
+                  await gitPush(gitCwdRef.current);
+                  notifyGitChanged();
+                },
+              },
+            },
+          ]
+        : []),
+  ];
 
   const debounce = useRef({ name: "", at: 0 });
   const run = useCallback((name: string, fn: () => void) => {

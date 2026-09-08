@@ -390,6 +390,16 @@ pub async fn git_stage_all(cwd: String) -> Result<(), String> {
     .map_err(|e| e.to_string())?
 }
 
+/// Stage changes to already-tracked files only (skips new untracked files).
+#[tauri::command]
+pub async fn git_stage_tracked(cwd: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        git_checked(&expand_home(&cwd), &["add", "-u", "--", "."])
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// Unstage every staged file.
 #[tauri::command]
 pub async fn git_unstage_all(cwd: String) -> Result<(), String> {

@@ -180,6 +180,11 @@ export function gitStageAll(cwd: string): Promise<void> {
   return invoke<void>("git_stage_all", { cwd });
 }
 
+/** Stages modifications/deletions to already-tracked files; skips new untracked files. */
+export function gitStageTracked(cwd: string): Promise<void> {
+  return invoke<void>("git_stage_tracked", { cwd });
+}
+
 export function gitUnstageAll(cwd: string): Promise<void> {
   return invoke<void>("git_unstage_all", { cwd });
 }
