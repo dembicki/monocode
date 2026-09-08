@@ -1,4 +1,5 @@
 @import "./themes/dark.css";
+@import "./themes/black.css";
 @import "./themes/transparent.css";
 @import "tailwindcss";
 @source "../node_modules/streamdown/dist/*.js";

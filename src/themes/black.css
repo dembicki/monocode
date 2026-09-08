@@ -1,0 +1,14 @@
+/* Pure black theme. The hue/saturation tint sliders are pinned to neutral
+   here (via !important, which beats the inline style the tint sliders write)
+   so this theme always renders true black-and-white regardless of the user's
+   tint settings. */
+html[data-theme="black"]:not(.theme-light) {
+  --theme-hue: 0 !important;
+  --theme-saturation: 0% !important;
+  --background-lightness: 0%;
+  --content-lightness: 96%;
+  --accent-color: #3b82f6;
+  --link-color: #5b9dff;
+  --color-mention: #3b82f6;
+  --color-markdown-heading: #93c5fd;
+}
