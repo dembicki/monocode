@@ -129,6 +129,32 @@ function gitOverlayForCwd(cwd: string, git?: SessionGitHint): SessionGitHint {
   return { ...git, repo: name };
 }
 
+/**
+ * Same merge as {@link historyWithLiveSessions}, but spanning every project
+ * instead of one `cwd` — the whole set the sidebar can show across projects,
+ * for pickers (like the session switcher) that quick-jump across all of them.
+ */
+export function allHistoryWithLiveSessions(
+  history: SessionSummary[],
+  sessions: Session[],
+): SessionSummary[] {
+  const inboxIds = new Set(
+    sessions.filter((session) => session.inboxAsk).map((session) => session.id),
+  );
+  let rows = history.filter((entry) => !inboxIds.has(entry.id));
+  for (const session of sessions) {
+    if (session.inboxAsk) continue;
+    const live = session.busy || sessionNeedsInput(session);
+    if (!shouldPersistSession(session) && !live) continue;
+    if (rows.some((row) => row.id === session.id)) continue;
+    const hint: SessionGitHint = {
+      ...(session.branch ? { branch: session.branch } : {}),
+    };
+    rows = mergeHistorySummary(rows, summaryFromSession(session, hint));
+  }
+  return [...rows].sort(compareSessionSummaries);
+}
+
 export function historyWithLiveSessions(
   history: SessionSummary[],
   sessions: Session[],

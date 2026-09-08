@@ -110,6 +110,15 @@ describe("tabCommand", () => {
     ).toBe("next");
   });
 
+  it("cycles adjacent tabs with ctrl-h and ctrl-l", () => {
+    expect(tabCommand(key({ key: "h", ctrlKey: true }))).toBe("prev");
+    expect(tabCommand(key({ key: "l", ctrlKey: true }))).toBe("next");
+    expect(
+      tabCommand(key({ key: "H", ctrlKey: true, shiftKey: true })),
+    ).toBeNull();
+    expect(tabCommand(key({ key: "l", metaKey: true }))).toBeNull();
+  });
+
   it("uses shift-mod arrows for session and project navigation", () => {
     expect(
       tabCommand(key({ key: "ArrowUp", metaKey: true, shiftKey: true })),

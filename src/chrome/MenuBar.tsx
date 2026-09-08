@@ -11,6 +11,7 @@ type Props = {
   onNewTerminal?: () => void;
   onToggleTerminal?: () => void;
   onGoToFile?: () => void;
+  onSessionSwitcher?: () => void;
   onToggleSidebar: () => void;
   onShowSourceControl?: () => void;
   onCloseCurrentTab?: () => void;
@@ -30,6 +31,7 @@ export function MenuBar({
   onNewTerminal,
   onToggleTerminal,
   onGoToFile,
+  onSessionSwitcher,
   onToggleSidebar,
   onShowSourceControl,
   onCloseCurrentTab,
@@ -132,6 +134,9 @@ export function MenuBar({
         case "go_to_file":
           onGoToFile?.();
           break;
+        case "session_switcher":
+          onSessionSwitcher?.();
+          break;
         case "find_in_project":
           onFindInProject?.();
           break;
@@ -195,7 +200,8 @@ export function MenuBar({
           { kind: "sep" },
           { kind: "item", id: "open_project", label: "Open Project…", shortcut: `${MOD}O` },
           { kind: "item", id: "open_search", label: "Search…", shortcut: `${MOD}K` },
-          { kind: "item", id: "go_to_file", label: "Go to File…", shortcut: `${MOD}P` },
+          { kind: "item", id: "go_to_file", label: "Go to File…", shortcut: `${MOD}F` },
+          { kind: "item", id: "session_switcher", label: "Switch Session…", shortcut: `${MOD}P` },
           { kind: "item", id: "find_in_project", label: "Find in Files…", shortcut: `${MOD}${SHIFT}F` },
           { kind: "sep" },
           { kind: "item", id: "close_tab", label: "Close Pane", shortcut: `${MOD}W` },

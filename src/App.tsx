@@ -17,6 +17,7 @@ import { WhatsNewDialog } from "./chrome/WhatsNewDialog";
 import { TitleBar, type Tab as TitleTab } from "./chrome/TitleBar";
 import { MenuBar } from "./chrome/MenuBar";
 import { FilePicker } from "./chrome/FilePicker";
+import { SessionSwitcher } from "./chrome/SessionSwitcher";
 import { UsageFooter } from "./chrome/UsageFooter";
 import { useProjectBranches } from "./hooks/useProjectBranches";
 import {
@@ -343,6 +344,7 @@ import {
 } from "./surfaces/editorSearch";
 
 import {
+  allHistoryWithLiveSessions,
   mergeHistorySummary,
   mergeProjectHistorySummary,
   replaceProjectHistory,
@@ -634,6 +636,7 @@ export default function App({
     useState<EditorNavigationTarget | null>(null);
   const editorNavigationToken = useRef(0);
   const [filePickerOpen, setFilePickerOpen] = useState(false);
+  const [sessionSwitcherOpen, setSessionSwitcherOpen] = useState(false);
   const [dirtyFiles, setDirtyFiles] = useState<Set<string>>(
     () => new Set(windowTransfer?.dirtyFileIds ?? []),
   );
@@ -685,6 +688,8 @@ export default function App({
   const sessionNavigationIdsRef = useRef<readonly string[]>([]);
   const filePickerOpenRef = useRef(filePickerOpen);
   filePickerOpenRef.current = filePickerOpen;
+  const sessionSwitcherOpenRef = useRef(sessionSwitcherOpen);
+  sessionSwitcherOpenRef.current = sessionSwitcherOpen;
   const whatsNewVersionRef = useRef(whatsNewVersion);
   whatsNewVersionRef.current = whatsNewVersion;
 
@@ -4541,6 +4546,10 @@ export default function App({
       }),
     [history, projectBranches, sessions, sidebarCwd],
   );
+  const allHistory = useMemo(
+    () => allHistoryWithLiveSessions(history, sessions),
+    [history, sessions],
+  );
   const openProjectSessions = useMemo(
     () =>
       sessions
@@ -4578,7 +4587,16 @@ export default function App({
     setSearchViewOpen(false);
     setInboxViewOpen(false);
     setNotesViewOpen(false);
+    setSessionSwitcherOpen(false);
     setFilePickerOpen(true);
+  }, []);
+
+  const onSessionSwitcher = useCallback(() => {
+    setSearchViewOpen(false);
+    setInboxViewOpen(false);
+    setNotesViewOpen(false);
+    setFilePickerOpen(false);
+    setSessionSwitcherOpen(true);
   }, []);
 
   const onFindInProject = useCallback(() => {
@@ -4592,6 +4610,7 @@ export default function App({
 
   const onOpenSearch = useCallback(() => {
     setFilePickerOpen(false);
+    setSessionSwitcherOpen(false);
     setSettingsOpen(false);
     setInboxViewOpen(false);
     setNotesViewOpen(false);
@@ -4605,6 +4624,7 @@ export default function App({
 
   const onOpenInbox = useCallback(() => {
     setFilePickerOpen(false);
+    setSessionSwitcherOpen(false);
     setSettingsOpen(false);
     setSearchViewOpen(false);
     setNotesViewOpen(false);
@@ -4618,6 +4638,7 @@ export default function App({
   const onOpenNotes = useCallback(() => {
     if (!loadNotesEnabled()) return;
     setFilePickerOpen(false);
+    setSessionSwitcherOpen(false);
     setSettingsOpen(false);
     setSearchViewOpen(false);
     setInboxViewOpen(false);
@@ -4630,6 +4651,7 @@ export default function App({
 
   const openSettings = useCallback((section?: SettingsSectionId) => {
     setFilePickerOpen(false);
+    setSessionSwitcherOpen(false);
     setSearchViewOpen(false);
     setInboxViewOpen(false);
     setNotesViewOpen(false);
@@ -4769,6 +4791,7 @@ export default function App({
     onFocusDir,
     onToggleSidebar,
     onGoToFile,
+    onSessionSwitcher,
     onFindInProject,
     onOpenSearch,
     onOpenInbox,
@@ -4796,6 +4819,7 @@ export default function App({
     onFocusDir,
     onToggleSidebar,
     onGoToFile,
+    onSessionSwitcher,
     onFindInProject,
     onOpenSearch,
     onOpenInbox,
@@ -4946,13 +4970,28 @@ export default function App({
         return;
       }
       const mod = e.metaKey || e.ctrlKey;
-      if (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "b") {
+      // On Mac, bare Ctrl+B is its own shortcut (BranchPicker) distinct from
+      // Cmd+B — only treat Ctrl as the "mod" stand-in on other platforms.
+      const ctrlIsMod = !(IS_MAC && e.ctrlKey && !e.metaKey);
+      if (
+        mod &&
+        ctrlIsMod &&
+        !e.altKey &&
+        !e.shiftKey &&
+        e.key.toLowerCase() === "b"
+      ) {
         e.preventDefault();
         e.stopPropagation();
         run("toggle_sidebar", actions.current.onToggleSidebar);
         return;
       }
       if (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        e.stopPropagation();
+        run("session_switcher", actions.current.onSessionSwitcher);
+        return;
+      }
+      if (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "f") {
         e.preventDefault();
         e.stopPropagation();
         run("go_to_file", actions.current.onGoToFile);
@@ -5031,6 +5070,7 @@ export default function App({
         void actions.current.pickProject();
       }),
       listen("go_to_file", () => actions.current.onGoToFile()),
+      listen("session_switcher", () => actions.current.onSessionSwitcher()),
       listen("open_search", () => actions.current.onOpenSearch()),
       listen("open_inbox", () => actions.current.onOpenInbox()),
       listen("open_notes", () => actions.current.onOpenNotes()),
@@ -5249,6 +5289,7 @@ export default function App({
               onNewTerminal={onNewTerminal}
               onToggleTerminal={onToggleProjectTerminal}
               onGoToFile={onGoToFile}
+              onSessionSwitcher={onSessionSwitcher}
               onToggleSidebar={onToggleSidebar}
               onShowSourceControl={onToggleChanges}
               onCloseCurrentTab={
@@ -5495,6 +5536,16 @@ export default function App({
           openPaths={openFilePaths}
           onOpenFile={onOpenFile}
           onClose={() => setFilePickerOpen(false)}
+        />
+      ) : null}
+
+      {sessionSwitcherOpen ? (
+        <SessionSwitcher
+          open
+          sessions={allHistory}
+          activeSessionId={activeSessionId}
+          onSelectSession={onSelectHistorySession}
+          onClose={() => setSessionSwitcherOpen(false)}
         />
       ) : null}
 

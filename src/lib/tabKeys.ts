@@ -13,6 +13,8 @@
  *   Last tab            cmd-9
  *   Cycle next tab      ctrl-tab
  *   Cycle previous tab  ctrl-shift-tab
+ *   Previous tab        ctrl-h
+ *   Next tab            ctrl-l
  *   Focus pane          cmd-opt-arrows
  *   New terminal        cmd-`
  *   New terminal tab    shift-cmd-`
@@ -67,6 +69,12 @@ export function tabCommand(e: KeyboardEvent): TabCommand | null {
 
   if (e.key === "Tab" && e.ctrlKey && !e.metaKey && !e.altKey) {
     return e.shiftKey ? "prev" : "next";
+  }
+
+  if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+    const key = e.key.toLowerCase();
+    if (key === "h") return "prev";
+    if (key === "l") return "next";
   }
 
   if (!mod || e.altKey) return null;

@@ -671,6 +671,7 @@ function CodeMirrorEditor({
           keymap.of([
             ...foldKeymap,
             { key: "Mod-s", run: save, preventDefault: true },
+            { key: "Ctrl-s", run: save, preventDefault: true },
             {
               key: "Tab",
               run: (view) => {

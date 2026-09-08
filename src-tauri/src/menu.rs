@@ -20,7 +20,8 @@ pub fn dispatch(app: &AppHandle, id: &str) {
         "new_tab" | "close_tab" | "close_other_tabs" | "next_tab" | "prev_tab" | "back_tab"
         | "forward_tab" | "split_right" | "split_down" | "focus_left" | "focus_right"
         | "focus_up" | "focus_down" | "toggle_sidebar" | "sidebar_opacity" | "open_project"
-        | "go_to_file" | "open_search" | "open_inbox" | "open_notes" | "find_in_project"
+        | "go_to_file" | "session_switcher" | "open_search" | "open_inbox" | "open_notes"
+        | "find_in_project"
         | "find" | "new_terminal" | "new_terminal_tab" | "toggle_terminal"
         | "open_model_picker" | "open_settings" | "check_for_updates" => {
             let _ = app.emit(id, ());
@@ -66,6 +67,9 @@ fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .accelerator("CmdOrCtrl+O")
         .build(app)?;
     let go_to_file = MenuItemBuilder::with_id("go_to_file", "Go to File…")
+        .accelerator("CmdOrCtrl+F")
+        .build(app)?;
+    let session_switcher = MenuItemBuilder::with_id("session_switcher", "Switch Session…")
         .accelerator("CmdOrCtrl+P")
         .build(app)?;
     let open_search = MenuItemBuilder::with_id("open_search", "Search…")
@@ -138,7 +142,7 @@ fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let zoom_out = MenuItemBuilder::with_id("zoom_out", "Zoom Out").build(app)?;
     let zoom_reset = MenuItemBuilder::with_id("zoom_reset", "Reset Zoom").build(app)?;
     let find = MenuItemBuilder::with_id("find", "Find")
-        .accelerator("CmdOrCtrl+F")
+        .accelerator("CmdOrCtrl+Alt+F")
         .build(app)?;
 
     let find_in_project = MenuItemBuilder::with_id("find_in_project", "Find in Files…")
@@ -150,6 +154,7 @@ fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .item(&open_project)
         .item(&open_search)
         .item(&go_to_file)
+        .item(&session_switcher)
         .item(&find_in_project)
         .separator()
         .item(&new_tab)

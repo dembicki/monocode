@@ -1179,6 +1179,7 @@ export function Composer({
                   cwd={cwd}
                   branch={branch}
                   enabled={enabled && !busy}
+                  hotkeys={hotkeys && enabled}
                   onChange={onBranchChange}
                   onClose={() => ref.current?.focus()}
                 />

@@ -37,7 +37,7 @@ export function handleEditorFindKey(event: KeyboardEvent): boolean {
   const target = event.target instanceof Element ? event.target : null;
   if (
     target?.closest(
-      "[data-file-picker], [data-model-picker], [data-branch-picker], [data-skill-picker], [data-mention-picker]",
+      "[data-file-picker], [data-session-switcher], [data-model-picker], [data-branch-picker], [data-skill-picker], [data-mention-picker]",
     )
   ) {
     return false;
@@ -48,13 +48,6 @@ export function handleEditorFindKey(event: KeyboardEvent): boolean {
   const key = event.key.toLowerCase();
 
   if (mod && event.altKey && !event.shiftKey && key === "f") {
-    if (!view) return false;
-    event.preventDefault();
-    openReplacePanel(view);
-    return true;
-  }
-
-  if (mod && !event.altKey && !event.shiftKey && key === "f") {
     if (!view) return false;
     event.preventDefault();
     openSearchPanel(view);
@@ -127,23 +120,11 @@ export function openFindInActiveEditor(): boolean {
   return true;
 }
 
-function openReplacePanel(view: EditorView): boolean {
-  openSearchPanel(view);
-  panels.get(view)?.setReplaceVisible(true, true);
-  return true;
-}
-
 function findKeymap(): KeyBinding[] {
   return [
     {
-      key: "Mod-f",
-      run: openSearchPanel,
-      scope: "editor search-panel",
-      preventDefault: true,
-    },
-    {
       key: "Mod-Alt-f",
-      run: openReplacePanel,
+      run: openSearchPanel,
       scope: "editor search-panel",
       preventDefault: true,
     },
@@ -206,7 +187,7 @@ class FindPanel implements Panel {
     this.expandButton = iconButton(
       "cm-find-expand",
       "Toggle Replace",
-      `${MOD}${ALT}F`,
+      null,
       svgIcon("M6 4l4 4-4 4"),
     );
     this.expandButton.setAttribute("aria-expanded", "false");
@@ -533,7 +514,7 @@ function toggleButton(label: string, title: string, shortcut: string) {
 function iconButton(
   className: string,
   title: string,
-  shortcut: string,
+  shortcut: string | null,
   icon: Node,
 ) {
   return elt(
@@ -541,7 +522,7 @@ function iconButton(
     {
       type: "button",
       class: className,
-      title: `${title} (${shortcut})`,
+      title: shortcut ? `${title} (${shortcut})` : title,
       "aria-label": title,
       tabindex: "-1",
     },

@@ -18,6 +18,7 @@ import {
 } from "../lib/fs";
 import { useLockOverscroll } from "../hooks/useLockOverscroll";
 import { useProjectBranchesState } from "../hooks/useProjectBranches";
+import { IS_MAC } from "../lib/platform";
 import { Popover } from "./Popover";
 import { SwitchBranchDialog } from "./SwitchBranchDialog";
 
@@ -25,6 +26,7 @@ type Props = {
   cwd: string;
   branch?: string;
   enabled?: boolean;
+  hotkeys?: boolean;
   onChange?: () => void;
   onClose?: () => void;
 };
@@ -32,8 +34,7 @@ type Props = {
 const MENU_WIDTH = 280;
 
 type Row =
-  | { kind: "create"; name: string }
-  | { kind: "branch"; branch: GitBranchInfo };
+  { kind: "create"; name: string } | { kind: "branch"; branch: GitBranchInfo };
 
 type PendingSwitch =
   | { kind: "create"; name: string }
@@ -46,6 +47,7 @@ export function BranchPicker({
   cwd,
   branch,
   enabled = true,
+  hotkeys = false,
   onChange,
   onClose,
 }: Props) {
@@ -122,8 +124,7 @@ export function BranchPicker({
       (entry) => !entry.remote && entry.name === name,
     );
     const selected = branch || projectBranches?.current;
-    const create: Row[] =
-      name && !taken ? [{ kind: "create", name }] : [];
+    const create: Row[] = name && !taken ? [{ kind: "create", name }] : [];
     return [
       ...create,
       ...filtered.map((entry) => ({
@@ -248,6 +249,22 @@ export function BranchPicker({
       ? "No git repository"
       : label;
   const interactive = enabled && !awaitingBranch && !missingGit;
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!hotkeys || !IS_MAC) return;
+      if (e.isComposing) return;
+      if (!e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+      if (e.key.toLowerCase() !== "b") return;
+      if (!interactive || blocked) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (open) dismiss(true);
+      else setOpen(true);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [hotkeys, interactive, blocked, open]);
 
   return (
     <div className="flex max-w-[45%] shrink-0 items-center gap-2.5">

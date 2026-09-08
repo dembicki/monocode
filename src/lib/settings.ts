@@ -358,7 +358,8 @@ export type KeybindingRow = {
  */
 export const KEYBINDINGS: KeybindingRow[] = [
   { command: "App: Search", keys: `${MOD}K`, when: "Always" },
-  { command: "App: Go to File", keys: `${MOD}P`, when: "Always" },
+  { command: "App: Go to File", keys: `${MOD}F`, when: "Always" },
+  { command: "App: Switch Session", keys: `${MOD}P`, when: "Always" },
   { command: "App: Find in Files", keys: `${MOD}${SHIFT}F`, when: "Always" },
   { command: "App: Open Project", keys: `${MOD}O`, when: "Always" },
   { command: "App: New Window", keys: `${MOD}${SHIFT}N`, when: "Always" },
@@ -369,8 +370,16 @@ export const KEYBINDINGS: KeybindingRow[] = [
   { command: "View: Reset Zoom", keys: `${MOD}0`, when: "Always" },
   { command: "Tab: New", keys: `${MOD}T`, when: "Always" },
   { command: "Tab: Close Others", keys: `${MOD}${ALT}T`, when: "Always" },
-  { command: "Tab: Next", keys: `${MOD}${SHIFT}]`, when: "Always" },
-  { command: "Tab: Previous", keys: `${MOD}${SHIFT}[`, when: "Always" },
+  {
+    command: "Tab: Next",
+    keys: `${MOD}${SHIFT}] / ${CTRL}L`,
+    when: "Always",
+  },
+  {
+    command: "Tab: Previous",
+    keys: `${MOD}${SHIFT}[ / ${CTRL}H`,
+    when: "Always",
+  },
   { command: "Tab: Cycle Next", keys: `${CTRL}Tab`, when: "Always" },
   {
     command: "Tab: Cycle Previous",
@@ -420,8 +429,21 @@ export const KEYBINDINGS: KeybindingRow[] = [
   { command: "Terminal: New", keys: `${MOD}\``, when: "Always" },
   { command: "Terminal: New Tab", keys: `${MOD}${SHIFT}\``, when: "Always" },
   { command: "Terminal: Toggle Dock", keys: `${MOD}J`, when: "Always" },
-  { command: "Editor: Find", keys: `${MOD}F`, when: "editorFocus" },
-  { command: "Editor: Replace", keys: `${MOD}${ALT}F`, when: "editorFocus" },
+  {
+    command: "Editor: Save",
+    keys: IS_MAC ? `${MOD}S / ${CTRL}S` : `${CTRL}S`,
+    when: "editorFocus",
+  },
+  { command: "Editor: Find", keys: `${MOD}${ALT}F`, when: "editorFocus" },
+  ...(IS_MAC
+    ? [
+        {
+          command: "Composer: Switch Branch",
+          keys: `${CTRL}B`,
+          when: "Always",
+        },
+      ]
+    : []),
 ];
 
 export function filterKeybindings(
