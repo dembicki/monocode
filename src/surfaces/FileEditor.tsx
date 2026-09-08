@@ -33,6 +33,7 @@ import {
   RotateCcw,
 } from "../chrome/icons";
 import { minimalSetup } from "codemirror";
+import { vim } from "@replit/codemirror-vim";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   MarkdownViewShell,
@@ -53,6 +54,7 @@ import {
 } from "../lib/fs";
 import { syncWatchedMtime, watchFile } from "../lib/fileWatch";
 import { displayPath } from "../lib/paths";
+import { loadEditorVimMode, subscribeEditorVimMode } from "../lib/settings";
 import type { EditorNavigation } from "../lib/search";
 import { MarkdownPreview } from "./AgentMarkdown";
 import {
@@ -78,6 +80,7 @@ import { editorSearch } from "./editorSearch";
 type EditorNavigationRequest = EditorNavigation & { token: number };
 
 const editorScheme = new Compartment();
+const editorVimMode = new Compartment();
 
 type Props = {
   path: string;
@@ -639,6 +642,9 @@ function CodeMirrorEditor({
       doc: valueRef.current,
       parent: host,
       extensions: [
+        // Vim must be installed before CodeMirror's other keymaps so normal
+        // mode commands get the first chance to handle each keystroke.
+        editorVimMode.of(loadEditorVimMode() ? vim({ status: true }) : []),
         minimalSetup,
         showDiff
           ? editorGit({
@@ -733,6 +739,18 @@ function CodeMirrorEditor({
       view.destroy();
     };
   }, [lockOverscroll, path, showDiff, syncChunkNav]);
+
+  useEffect(() => {
+    return subscribeEditorVimMode(() => {
+      const view = viewRef.current;
+      if (!view) return;
+      view.dispatch({
+        effects: editorVimMode.reconfigure(
+          loadEditorVimMode() ? vim({ status: true }) : [],
+        ),
+      });
+    });
+  }, []);
 
   useEffect(() => {
     const view = viewRef.current;

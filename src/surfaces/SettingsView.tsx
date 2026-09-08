@@ -149,6 +149,7 @@ import {
   loadClaudeHooks,
   loadComposerRunner,
   loadDiffViewer,
+  loadEditorVimMode,
   loadFollowUpBehavior,
   loadGridArcadeEnabled,
   loadLiveAgentsEnabled,
@@ -156,6 +157,7 @@ import {
   saveClaudeHooks,
   saveComposerRunner,
   saveDiffViewer,
+  saveEditorVimMode,
   saveFollowUpBehavior,
   saveGridArcadeEnabled,
   saveLiveAgentsEnabled,
@@ -305,6 +307,7 @@ function GeneralPage({
   const [transcriptAnchor, setTranscriptAnchor] =
     useState(loadTranscriptAnchor);
   const [diffViewer, setDiffViewer] = useState<DiffViewer>(loadDiffViewer);
+  const [editorVimMode, setEditorVimMode] = useState(loadEditorVimMode);
   const [followUpBehavior, setFollowUpBehavior] =
     useState<FollowUpBehavior>(loadFollowUpBehavior);
   const [composerRunner, setComposerRunner] = useState(loadComposerRunner);
@@ -358,6 +361,11 @@ function GeneralPage({
   const onDiffViewer = (next: DiffViewer) => {
     saveDiffViewer(next);
     setDiffViewer(next);
+  };
+
+  const onEditorVimMode = (next: boolean) => {
+    saveEditorVimMode(next);
+    setEditorVimMode(next);
   };
 
   const onFollowUpBehavior = (next: FollowUpBehavior) => {
@@ -430,6 +438,16 @@ function GeneralPage({
             { value: "unified", label: "Unified" },
           ]}
           onChange={onDiffViewer}
+        />
+      </Row>
+      <Row
+        label="Vim mode"
+        description="Use Vim motions, modes, operators, and keybindings in the file editor."
+      >
+        <Toggle
+          label="Vim mode"
+          on={editorVimMode}
+          onChange={onEditorVimMode}
         />
       </Row>
       <Row

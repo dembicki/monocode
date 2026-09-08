@@ -91,6 +91,26 @@ function editorThemeStyles(dark: boolean) {
     ".cm-panels": {
       borderColor: "color-mix(in srgb, var(--color-content) 10%, transparent)",
     },
+    ".cm-vim-panel": {
+      minHeight: "24px",
+      alignItems: "center",
+      padding: "0 10px",
+      fontFamily: "var(--font-mono)",
+      fontSize: "10.5px",
+      color: "color-mix(in srgb, var(--color-content) 48%, transparent)",
+    },
+    ".cm-vim-panel > span:first-child": {
+      color: "var(--color-accent)",
+      fontWeight: "600",
+      letterSpacing: "0.04em",
+    },
+    ".cm-vim-panel input": {
+      minWidth: "0",
+      flex: "1",
+      color: "var(--color-content)",
+      fontFamily: "var(--font-mono)",
+      fontSize: "10.5px",
+    },
     ".cm-tooltip": {
       border:
         "1px solid color-mix(in srgb, var(--color-content) 12%, transparent)",
@@ -140,4 +160,3 @@ export function schemeExtensions(scheme: ColorScheme): Extension[] {
     syntaxHighlighting(editorHighlightStyleFor(scheme)),
   ];
 }
-

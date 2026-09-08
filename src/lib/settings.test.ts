@@ -2,12 +2,14 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   COMPOSER_RUNNER_DEFAULT,
   DIFF_VIEWER_DEFAULT,
+  EDITOR_VIM_MODE_DEFAULT,
   FOLLOW_UP_BEHAVIOR_DEFAULT,
   GRID_ARCADE_ENABLED_DEFAULT,
   KEYBINDINGS,
   LIVE_AGENTS_ENABLED_DEFAULT,
   loadComposerRunner,
   loadDiffViewer,
+  loadEditorVimMode,
   loadFollowUpBehavior,
   loadGridArcadeEnabled,
   loadLiveAgentsEnabled,
@@ -15,6 +17,7 @@ import {
   NOTES_ENABLED_DEFAULT,
   saveComposerRunner,
   saveDiffViewer,
+  saveEditorVimMode,
   saveFollowUpBehavior,
   saveGridArcadeEnabled,
   saveLiveAgentsEnabled,
@@ -26,6 +29,7 @@ const NOTES_KEY = "monocode.notesEnabled";
 const LIVE_AGENTS_KEY = "monocode.liveAgentsEnabled";
 const GRID_ARCADE_KEY = "monocode.gridArcadeEnabled";
 const DIFF_VIEWER_KEY = "monocode.diffViewer";
+const EDITOR_VIM_MODE_KEY = "monocode.editorVimMode";
 const FOLLOW_UP_BEHAVIOR_KEY = "monocode.followUpBehavior";
 
 describe("follow-up behavior setting", () => {
@@ -195,5 +199,27 @@ describe("diff viewer setting", () => {
   it("ignores unknown stored values", () => {
     localStorage.setItem(DIFF_VIEWER_KEY, "split");
     expect(loadDiffViewer()).toBe("editor");
+  });
+});
+
+describe("editor Vim mode setting", () => {
+  beforeEach(mockLocalStorage);
+  afterEach(() => {
+    localStorage.removeItem(EDITOR_VIM_MODE_KEY);
+  });
+
+  it("defaults to off", () => {
+    expect(EDITOR_VIM_MODE_DEFAULT).toBe(false);
+    expect(loadEditorVimMode()).toBe(false);
+  });
+
+  it("persists the selected mode", () => {
+    saveEditorVimMode(true);
+    expect(localStorage.getItem(EDITOR_VIM_MODE_KEY)).toBe("1");
+    expect(loadEditorVimMode()).toBe(true);
+
+    saveEditorVimMode(false);
+    expect(localStorage.getItem(EDITOR_VIM_MODE_KEY)).toBe("0");
+    expect(loadEditorVimMode()).toBe(false);
   });
 });

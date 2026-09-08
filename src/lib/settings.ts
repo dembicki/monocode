@@ -286,6 +286,42 @@ export function subscribeDiffViewer(onStoreChange: () => void) {
     window.removeEventListener(DIFF_VIEWER_CHANGE_EVENT, onStoreChange);
 }
 
+const EDITOR_VIM_MODE_KEY = "monocode.editorVimMode";
+
+export const EDITOR_VIM_MODE_DEFAULT = false;
+
+/** Fired on `window` when Vim keybindings are enabled or disabled. */
+export const EDITOR_VIM_MODE_CHANGE_EVENT = "monocode:editor-vim-mode-change";
+
+export function loadEditorVimMode(): boolean {
+  try {
+    const raw = localStorage.getItem(EDITOR_VIM_MODE_KEY);
+    if (raw == null) return EDITOR_VIM_MODE_DEFAULT;
+    return raw === "1" || raw === "true";
+  } catch {
+    return EDITOR_VIM_MODE_DEFAULT;
+  }
+}
+
+export function saveEditorVimMode(value: boolean) {
+  try {
+    localStorage.setItem(EDITOR_VIM_MODE_KEY, value ? "1" : "0");
+  } catch {
+    // private mode / quota
+  }
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent<boolean>(EDITOR_VIM_MODE_CHANGE_EVENT, { detail: value }),
+  );
+}
+
+export function subscribeEditorVimMode(onStoreChange: () => void) {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(EDITOR_VIM_MODE_CHANGE_EVENT, onStoreChange);
+  return () =>
+    window.removeEventListener(EDITOR_VIM_MODE_CHANGE_EVENT, onStoreChange);
+}
+
 const CLAUDE_HOOKS_KEY = "monocode.claudeHooks";
 
 export const CLAUDE_HOOKS_DEFAULT = true;
