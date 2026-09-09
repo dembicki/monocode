@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import { newSession, type Block, type Session } from "./session";
 import {
   isPersistableId,
+  normalizeSessionSummary,
   persistFingerprint,
   sanitizeSessionForPersist,
+  type SessionSummary,
 } from "./sessionStore";
 
 describe("isPersistableId", () => {
@@ -15,6 +17,30 @@ describe("isPersistableId", () => {
   it("rejects filesystem paths", () => {
     expect(isPersistableId("/Users/me/.pi/agent/sessions/abc.jsonl")).toBe(
       false,
+    );
+  });
+});
+
+describe("normalizeSessionSummary", () => {
+  const summary = (category: unknown) =>
+    ({
+      id: "s1",
+      cwd: "/tmp/project",
+      harness: "codex",
+      model: "codex:gpt-5",
+      runtimeMode: "supervised",
+      title: "codex · Fix startup",
+      category,
+      createdAt: 1,
+      updatedAt: 2,
+    }) as SessionSummary;
+
+  it("keeps known categories and drops unknown stored values", () => {
+    expect(normalizeSessionSummary(summary("bug-fix")).category).toBe(
+      "bug-fix",
+    );
+    expect(normalizeSessionSummary(summary("future-category")).category).toBe(
+      undefined,
     );
   });
 });

@@ -80,6 +80,8 @@ pub struct SessionUpsert {
     pub runtime_mode: String,
     pub title: String,
     #[serde(default)]
+    pub category: Option<String>,
+    #[serde(default)]
     pub provider_session_id: Option<String>,
     pub blocks: Value,
     /// Last context-window reading reported by the harness, if any.
@@ -102,6 +104,8 @@ pub struct SessionSummary {
     pub model: String,
     pub runtime_mode: String,
     pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider_session_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -128,6 +132,8 @@ pub struct SessionRecord {
     pub model_settings: Value,
     pub runtime_mode: String,
     pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider_session_id: Option<String>,
     pub blocks: Value,
@@ -481,6 +487,7 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
         ("worktree_cwd", "TEXT"),
         ("has_user_message", "INTEGER NOT NULL DEFAULT 0"),
         ("pinned", "INTEGER NOT NULL DEFAULT 0"),
+        ("category", "TEXT"),
     ] {
         ensure_session_column(conn, column, decl)?;
     }
@@ -531,6 +538,20 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
         )?;
         conn.execute(
             "INSERT INTO schema_migrations (version, applied_at) VALUES (11, ?1)",
+            params![now_millis()],
+        )?;
+    }
+    if current < 12 {
+        ensure_column(conn, "category", "TEXT")?;
+        conn.execute_batch(
+            "DROP INDEX IF EXISTS sessions_cwd_cover_idx;
+             CREATE INDEX IF NOT EXISTS sessions_cwd_cover_idx
+               ON sessions (cwd, has_user_message, updated_at DESC, id, harness,
+                            model, runtime_mode, title, category, provider_session_id,
+                            created_at, branch, archived, pinned);",
+        )?;
+        conn.execute(
+            "INSERT INTO schema_migrations (version, applied_at) VALUES (12, ?1)",
             params![now_millis()],
         )?;
     }
@@ -615,10 +636,10 @@ fn upsert_session(conn: &Connection, session: &SessionUpsert) -> rusqlite::Resul
 
     conn.execute(
         "INSERT INTO sessions (
-           id, cwd, harness, model, model_settings, runtime_mode, title,
+           id, cwd, harness, model, model_settings, runtime_mode, title, category,
            provider_session_id, blocks_json, created_at, updated_at, branch,
            context_used, context_window, worktree_cwd, has_user_message
-         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
          ON CONFLICT(id) DO UPDATE SET
            cwd = excluded.cwd,
            harness = excluded.harness,
@@ -626,6 +647,7 @@ fn upsert_session(conn: &Connection, session: &SessionUpsert) -> rusqlite::Resul
            model_settings = excluded.model_settings,
            runtime_mode = excluded.runtime_mode,
            title = excluded.title,
+           category = excluded.category,
            provider_session_id = excluded.provider_session_id,
            blocks_json = excluded.blocks_json,
            updated_at = excluded.updated_at,
@@ -642,6 +664,7 @@ fn upsert_session(conn: &Connection, session: &SessionUpsert) -> rusqlite::Resul
             model_settings,
             session.runtime_mode,
             session.title,
+            session.category,
             provider_session_id,
             blocks_json,
             created_at,
@@ -661,6 +684,7 @@ fn upsert_session(conn: &Connection, session: &SessionUpsert) -> rusqlite::Resul
         model: session.model.clone(),
         runtime_mode: session.runtime_mode.clone(),
         title: session.title.clone(),
+        category: session.category.clone(),
         provider_session_id: provider_session_id.map(str::to_owned),
         branch: branch.map(str::to_owned),
         repo: git.repo,
@@ -922,7 +946,7 @@ fn ceil_char_boundary(text: &str, mut index: usize) -> usize {
 fn list_by_project(conn: &Connection, cwd: &str) -> rusqlite::Result<Vec<SessionSummary>> {
     let git = crate::fs::git_info_for(&crate::fs::expand_home(cwd));
     let mut statement = conn.prepare(
-        "SELECT id, cwd, harness, model, runtime_mode, title, provider_session_id,
+        "SELECT id, cwd, harness, model, runtime_mode, title, category, provider_session_id,
                 created_at, updated_at, branch, archived, pinned
          FROM sessions
          WHERE cwd = ?1
@@ -931,9 +955,9 @@ fn list_by_project(conn: &Connection, cwd: &str) -> rusqlite::Result<Vec<Session
          ORDER BY updated_at DESC, id ASC",
     )?;
     let rows = statement.query_map(params![cwd], |row| {
-        let stored_branch: Option<String> = row.get(9)?;
-        let archived: i64 = row.get(10)?;
-        let pinned: i64 = row.get(11)?;
+        let stored_branch: Option<String> = row.get(10)?;
+        let archived: i64 = row.get(11)?;
+        let pinned: i64 = row.get(12)?;
         Ok(SessionSummary {
             id: row.get(0)?,
             cwd: row.get(1)?,
@@ -941,9 +965,10 @@ fn list_by_project(conn: &Connection, cwd: &str) -> rusqlite::Result<Vec<Session
             model: row.get(3)?,
             runtime_mode: row.get(4)?,
             title: row.get(5)?,
-            provider_session_id: row.get(6)?,
-            created_at: row.get(7)?,
-            updated_at: row.get(8)?,
+            category: row.get(6)?,
+            provider_session_id: row.get(7)?,
+            created_at: row.get(8)?,
+            updated_at: row.get(9)?,
             branch: nonempty(stored_branch).or_else(|| git.branch.clone()),
             repo: git.repo.clone(),
             additions: 0,
@@ -999,7 +1024,7 @@ fn set_pinned(conn: &Connection, session_id: &str, pinned: bool) -> rusqlite::Re
 
 fn get_session(conn: &Connection, session_id: &str) -> rusqlite::Result<Option<SessionRecord>> {
     conn.query_row(
-        "SELECT id, cwd, harness, model, model_settings, runtime_mode, title,
+        "SELECT id, cwd, harness, model, model_settings, runtime_mode, title, category,
                 provider_session_id, blocks_json, created_at, updated_at,
                 context_used, context_window, branch, worktree_cwd
          FROM sessions
@@ -1007,7 +1032,7 @@ fn get_session(conn: &Connection, session_id: &str) -> rusqlite::Result<Option<S
         params![session_id],
         |row| {
             let model_settings_raw: String = row.get(4)?;
-            let blocks_raw: String = row.get(8)?;
+            let blocks_raw: String = row.get(9)?;
             let model_settings = serde_json::from_str(&model_settings_raw).map_err(|e| {
                 rusqlite::Error::FromSqlConversionFailure(
                     4,
@@ -1017,7 +1042,7 @@ fn get_session(conn: &Connection, session_id: &str) -> rusqlite::Result<Option<S
             })?;
             let blocks = serde_json::from_str(&blocks_raw).map_err(|e| {
                 rusqlite::Error::FromSqlConversionFailure(
-                    8,
+                    9,
                     rusqlite::types::Type::Text,
                     Box::new(e),
                 )
@@ -1030,14 +1055,15 @@ fn get_session(conn: &Connection, session_id: &str) -> rusqlite::Result<Option<S
                 model_settings,
                 runtime_mode: row.get(5)?,
                 title: row.get(6)?,
-                provider_session_id: row.get(7)?,
+                category: row.get(7)?,
+                provider_session_id: row.get(8)?,
                 blocks,
-                context_used: row.get(11)?,
-                context_window: row.get(12)?,
-                branch: row.get(13)?,
-                worktree_cwd: row.get(14)?,
-                created_at: row.get(9)?,
-                updated_at: row.get(10)?,
+                context_used: row.get(12)?,
+                context_window: row.get(13)?,
+                branch: row.get(14)?,
+                worktree_cwd: row.get(15)?,
+                created_at: row.get(10)?,
+                updated_at: row.get(11)?,
             })
         },
     )
@@ -1145,6 +1171,7 @@ mod tests {
             model_settings: json!({ "thinking": "high" }),
             runtime_mode: "supervised".into(),
             title: title.into(),
+            category: None,
             provider_session_id: Some("acp-session-1".into()),
             blocks: json!([{ "id": "b1", "role": "user", "text": "hello" }]),
             context_used: None,
@@ -1498,13 +1525,18 @@ mod tests {
     fn get_round_trips_blocks_and_provider_session_id() {
         let store = SessionStore::open_in_memory().unwrap();
         let conn = store.conn.lock().unwrap();
-        upsert_session(&conn, &sample("s1", "/tmp/a", "First")).unwrap();
+        let mut session = sample("s1", "/tmp/a", "First");
+        session.category = Some("new-feature".into());
+        upsert_session(&conn, &session).unwrap();
         let record = get_session(&conn, "s1").unwrap().unwrap();
         assert_eq!(record.id, "s1");
+        assert_eq!(record.category.as_deref(), Some("new-feature"));
         assert_eq!(record.provider_session_id.as_deref(), Some("acp-session-1"));
         assert_eq!(record.model_settings["thinking"], "high");
         assert_eq!(record.blocks.as_array().unwrap().len(), 1);
         assert_eq!(record.blocks[0]["text"], "hello");
+        let listed = list_by_project(&conn, "/tmp/a").unwrap();
+        assert_eq!(listed[0].category.as_deref(), Some("new-feature"));
     }
 
     #[test]

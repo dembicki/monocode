@@ -10,10 +10,11 @@ import type {
   RuntimeMode,
   SecondOpinionMeta,
   Session,
+  SessionCategory,
   TaskListMeta,
   PlanBlockMeta,
 } from "./session";
-import { HARNESSES, RUNTIME_MODES } from "./session";
+import { asSessionCategory, HARNESSES, RUNTIME_MODES } from "./session";
 
 export type SessionSummary = {
   id: string;
@@ -22,6 +23,7 @@ export type SessionSummary = {
   model: string;
   runtimeMode: RuntimeMode;
   title: string;
+  category?: SessionCategory;
   providerSessionId?: string;
   branch?: string;
   repo?: string;
@@ -41,6 +43,7 @@ type SessionRecord = {
   modelSettings: Record<string, string>;
   runtimeMode: string;
   title: string;
+  category?: string | null;
   providerSessionId?: string | null;
   blocks: Block[];
   contextUsed?: number | null;
@@ -59,6 +62,7 @@ type SessionUpsertPayload = {
   modelSettings: Record<string, string>;
   runtimeMode: string;
   title: string;
+  category?: string;
   providerSessionId?: string;
   blocks: Block[];
   contextUsed?: number;
@@ -90,6 +94,7 @@ function persistableMeta(
     modelSettings: session.modelSettings,
     runtimeMode: session.runtimeMode,
     title: session.title,
+    ...(session.category ? { category: session.category } : {}),
     ...(session.providerSessionId && isPersistableId(session.providerSessionId)
       ? { providerSessionId: session.providerSessionId }
       : {}),
@@ -152,7 +157,7 @@ export async function upsertSession(
     if (deletedSessionIds.has(session.id)) return null;
     return invoke<SessionSummary>("session_upsert", { session: payload });
   });
-  return summary ? normalizeSummary(summary) : null;
+  return summary ? normalizeSessionSummary(summary) : null;
 }
 
 /**
@@ -186,7 +191,7 @@ export async function listSessionsByProject(
   const rows = await invoke<SessionSummary[]>("session_list_by_project", {
     cwd: normalizeProjectPath(cwd),
   });
-  return rows.map(normalizeSummary);
+  return rows.map(normalizeSessionSummary);
 }
 
 export type SessionSearchHit = {
@@ -431,9 +436,13 @@ function sanitizeTaskList(value: unknown): TaskListMeta | null {
   };
 }
 
-function normalizeSummary(summary: SessionSummary): SessionSummary {
+export function normalizeSessionSummary(
+  summary: SessionSummary,
+): SessionSummary {
+  const { category: rawCategory, ...rest } = summary;
+  const category = asSessionCategory(rawCategory);
   return {
-    ...summary,
+    ...rest,
     harness: asHarness(summary.harness),
     runtimeMode: asRuntimeMode(summary.runtimeMode),
     ...(summary.providerSessionId
@@ -441,6 +450,7 @@ function normalizeSummary(summary: SessionSummary): SessionSummary {
       : {}),
     ...(summary.branch ? { branch: summary.branch } : {}),
     ...(summary.repo ? { repo: summary.repo } : {}),
+    ...(category ? { category } : {}),
     additions: summary.additions ?? 0,
     deletions: summary.deletions ?? 0,
     archived: summary.archived || undefined,
@@ -465,6 +475,9 @@ function recordToSession(record: SessionRecord): Session {
         : {},
     runtimeMode: asRuntimeMode(record.runtimeMode),
     title: record.title,
+    ...(asSessionCategory(record.category)
+      ? { category: asSessionCategory(record.category) }
+      : {}),
     blocks,
     busy: false,
     ...(record.providerSessionId

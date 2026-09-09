@@ -1,10 +1,14 @@
 import { extractJsonObject, limitSection } from "./jsonText";
+import {
+  asSessionCategory,
+  type SessionCategory,
+} from "./session";
 
 const MESSAGE_LIMIT = 8_000;
 const TITLE_LIMIT = 50;
 
-const THREAD_TITLE_PROMPT = `Generate a title that will help the user recognize this coding session weeks later.
-Return JSON with exactly one key: title.
+const THREAD_TITLE_PROMPT = `Generate a title and primary category that will help the user recognize this coding session weeks later.
+Return JSON with exactly two keys: title and category.
 Do not call tools. Reply with JSON only.
 
 Before answering, silently reduce the request to:
@@ -22,7 +26,19 @@ Editorial rules:
 - Models, subagents, tools, and output formats do not belong in the title unless they are themselves the topic.
 - Do not claim the work is complete.
 - Do not copy and truncate the user's message.
-- Avoid quotes, labels, filler, and trailing punctuation.`;
+- Avoid quotes, labels, filler, and trailing punctuation.
+
+Category rules:
+- Use exactly one of: code-review, investigation, planning, bug-fix, new-feature, refactor, docs, maintenance, other.
+- Choose the user's primary requested outcome, not incidental implementation steps.
+- Use investigation when the goal is to understand or diagnose without an explicit request to change code.
+- Use bug-fix when the user asks to correct broken or incorrect behavior.
+- Use code-review for reviewing a diff, pull request, commit, or existing code.`;
+
+export type GeneratedThreadMetadata = {
+  title: string;
+  category?: SessionCategory;
+};
 
 export function buildThreadTitlePrompt(message: string): string {
   return `${THREAD_TITLE_PROMPT}\n\nUser message:\n${limitSection(message, MESSAGE_LIMIT)}`;
@@ -43,13 +59,22 @@ export function sanitizeThreadTitle(raw: string): string {
 }
 
 export function parseGeneratedThreadTitle(raw: string): string | null {
+  return parseGeneratedThreadMetadata(raw)?.title ?? null;
+}
+
+export function parseGeneratedThreadMetadata(
+  raw: string,
+): GeneratedThreadMetadata | null {
   const json = extractJsonObject(raw);
   if (json) {
     try {
       const parsed: unknown = JSON.parse(json);
       if (parsed && typeof parsed === "object" && "title" in parsed) {
         const title = sanitizeThreadTitle(String((parsed as { title: unknown }).title));
-        if (title) return title;
+        const category = asSessionCategory(
+          (parsed as { category?: unknown }).category,
+        );
+        if (title) return { title, ...(category ? { category } : {}) };
       }
     } catch {
       // Fall through to a bare-title parse when the model skipped JSON.
@@ -60,5 +85,5 @@ export function parseGeneratedThreadTitle(raw: string): string | null {
   if (!fallback || /[{}]/.test(fallback)) return null;
   const words = fallback.split(" ").filter(Boolean).length;
   if (words < 2 || words > 10) return null;
-  return fallback;
+  return { title: fallback };
 }

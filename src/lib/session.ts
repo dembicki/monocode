@@ -56,6 +56,109 @@ export type TaskListMeta = {
 /** One-shot behavior selected in the composer for the next harness turn. */
 export type TurnIntent = "default" | "plan" | "build";
 
+export const SESSION_CATEGORIES = [
+  "code-review",
+  "investigation",
+  "planning",
+  "bug-fix",
+  "new-feature",
+  "refactor",
+  "docs",
+  "maintenance",
+  "other",
+] as const;
+
+export type SessionCategory = (typeof SESSION_CATEGORIES)[number];
+
+export const SESSION_CATEGORY_LABEL: Record<SessionCategory, string> = {
+  "code-review": "Code review",
+  investigation: "Investigation",
+  planning: "Planning",
+  "bug-fix": "Bug fix",
+  "new-feature": "Feature",
+  refactor: "Refactor",
+  docs: "Docs",
+  maintenance: "Maintenance",
+  other: "Other",
+};
+
+export function asSessionCategory(value: unknown): SessionCategory | undefined {
+  return typeof value === "string" &&
+    (SESSION_CATEGORIES as readonly string[]).includes(value)
+    ? (value as SessionCategory)
+    : undefined;
+}
+
+/** Fast first-pass category; the title sidecar can replace it with semantic inference. */
+export function inferSessionCategory(
+  message: string,
+  intent: TurnIntent = "default",
+): SessionCategory {
+  if (intent === "plan") return "planning";
+  const text = message.toLowerCase();
+  const matches = (pattern: RegExp) => pattern.test(text);
+  if (matches(/\b(code review|review (?:this|the|my|a )?(?:pr|pull request|diff|change|code)|audit (?:this|the|my|a )?(?:pr|diff|change|code))\b/)) {
+    return "code-review";
+  }
+  if (matches(/\b(fix(?:es|ed|ing)?|bug|broken|regression|crash|error|failure)\b/)) {
+    return "bug-fix";
+  }
+  if (matches(/\b(refactor\w*|restructure|simplif(?:y|ies|ied)|clean up)\b/)) {
+    return "refactor";
+  }
+  if (matches(/\b(documentation|docs?|readme|changelog)\b/)) return "docs";
+  if (matches(/\b(maintenance|upgrade|update dependenc\w*|bump|cleanup|chore)\b/)) {
+    return "maintenance";
+  }
+  if (matches(/\b(add|build|create|implement|introduce|new feature|support)\b/)) {
+    return "new-feature";
+  }
+  if (matches(/\b(investigat\w*|analy[sz]\w*|diagnos\w*|debug\w*|root cause|look into|figure out why)\b/)) {
+    return "investigation";
+  }
+  if (matches(/\b(plan(?:ning)?|design an? (?:approach|implementation)|write a plan)\b/)) {
+    return "planning";
+  }
+  return "other";
+}
+
+/**
+ * Keep a session's goal stable across incidental follow-ups, while allowing
+ * discovery/planning sessions to graduate when the user chooses an outcome.
+ */
+export function sessionCategoryForTurn(input: {
+  current?: SessionCategory;
+  message: string;
+  intent?: TurnIntent;
+  context?: string[];
+}): SessionCategory {
+  const intent = input.intent ?? "default";
+  if (intent === "plan") return input.current ?? "planning";
+
+  const inferred = inferSessionCategory(input.message);
+  if (!input.current || input.current === "other") return inferred;
+
+  if (input.current === "planning" && intent === "build") {
+    const candidates = [...(input.context ?? [])].reverse();
+    for (const candidate of candidates) {
+      const category = inferSessionCategory(candidate);
+      if (category !== "planning" && category !== "other") return category;
+    }
+    return input.current;
+  }
+
+  if (
+    input.current === "investigation" &&
+    inferred !== "investigation" &&
+    inferred !== "planning" &&
+    inferred !== "other"
+  ) {
+    return inferred;
+  }
+
+  return input.current;
+}
+
 export type PlanStatus = "streaming" | "ready" | "building" | "built";
 
 export type PlanBlockMeta = {
@@ -209,6 +312,8 @@ export type Session = {
   modelSettings: Record<string, string>;
   runtimeMode: RuntimeMode;
   title: string;
+  /** Primary goal inferred from the conversation for session-list navigation. */
+  category?: SessionCategory;
   /** Project / working directory for this session. */
   cwd: string;
   blocks: Block[];

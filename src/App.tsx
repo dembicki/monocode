@@ -243,6 +243,7 @@ import {
   HARNESS_TITLE,
   canReplaceSessionTitle,
   formatSessionTitle,
+  sessionCategoryForTurn,
   sessionNeedsInput,
   newDefaultSession,
   newSession,
@@ -3688,6 +3689,17 @@ export default function App({
         placeholderTitle
           ? titleFromPrompt(submittedText, current.harness, attachments)
           : current.title;
+      const categorySeed = sessionCategoryForTurn({
+        current: current.category,
+        message: submittedText,
+        intent,
+        context: [
+          ...current.blocks
+            .filter((block) => block.role === "user")
+            .map((block) => block.text),
+          ...(approvedPlan?.text ? [approvedPlan.text] : []),
+        ],
+      });
       const visible = displayAttachments(attachments);
       const card =
         options?.secondOpinion ??
@@ -3716,6 +3728,7 @@ export default function App({
           const titled = isFirstTurn ? titleSeed : selected.title;
           let next: Session = {
             ...selected,
+            ...(categorySeed ? { category: categorySeed } : {}),
             inboxCard: rawCommand ? s.inboxCard : undefined,
             noteCard: rawCommand ? s.noteCard : undefined,
             handoffCard: rawCommand ? s.handoffCard : undefined,
@@ -3792,15 +3805,22 @@ export default function App({
           message:
             harnessText || attachments.map((file) => file.name).join(", "),
         })
-          .then((title) => {
-            if (!title) return;
+          .then((generated) => {
+            if (!generated) return;
             setSessions((prev) =>
               prev.map((s) => {
                 if (s.id !== sessionId) return s;
                 if (!canReplaceSessionTitle(s.title, s.harness, titleSeed)) {
                   return s;
                 }
-                return { ...s, title: formatSessionTitle(s.harness, title) };
+                return {
+                  ...s,
+                  title: formatSessionTitle(s.harness, generated.title),
+                  ...(generated.category &&
+                  (!s.category || s.category === categorySeed)
+                    ? { category: generated.category }
+                    : {}),
+                };
               }),
             );
           })
@@ -4902,6 +4922,12 @@ export default function App({
   };
 
   const MOD = IS_MAC ? "⌘" : "Ctrl+";
+  const focusedSessionId =
+    activeTab &&
+    !activeTab.diffFocused &&
+    sessions.some((session) => session.id === activeTab.focusedId)
+      ? activeTab.focusedId
+      : null;
   // Rebuilt every render (not memoized): it's a short array of cheap object
   // literals, and memoizing it previously meant `loadNotesEnabled()` only got
   // re-read when an unrelated dependency changed, showing a stale "Notes"
@@ -4994,6 +5020,18 @@ export default function App({
         label: "Close Other Tabs",
         run: onCloseOtherTabs,
       },
+      ...(focusedSessionId
+        ? [
+            {
+              id: "archive_session",
+              label: "Archive Current Session",
+              shortcut: `${MOD}⇧A`,
+              run: () => {
+                void onArchiveHistorySession(focusedSessionId, true);
+              },
+            },
+          ]
+        : []),
       {
         id: "open_model_picker",
         label: "Switch Model…",

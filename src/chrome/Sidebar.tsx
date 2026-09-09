@@ -37,7 +37,12 @@ import {
 import { IS_MAC, MOD } from "../lib/platform";
 import { resolveModel } from "../lib/models";
 import { prettyParent, projectKey, projectName } from "../lib/paths";
-import { sessionDisplayTitle } from "../lib/session";
+import {
+  inferSessionCategory,
+  SESSION_CATEGORY_LABEL,
+  sessionDisplayTitle,
+  type SessionCategory,
+} from "../lib/session";
 import { nextUnseenFinishedSessions } from "../lib/sessionDone";
 import {
   orderedSessionActionIds,
@@ -2170,6 +2175,9 @@ function SessionCard({
   const skipClickUntil = useRef(0);
   const [dragging, setDragging] = useState(false);
   const title = sessionDisplayTitle(session.title, session.harness);
+  const inferredCategory =
+    session.category ?? inferSessionCategory(title, "default");
+  const category = inferredCategory === "other" ? null : inferredCategory;
   const gitLabel = formatGitLabel(session.repo, session.branch);
   const time = formatRelative(session.updatedAt, now);
   const model = compact
@@ -2386,6 +2394,14 @@ function SessionCard({
           {compact ? status : null}
         </span>
         <span className="relative mt-1 flex w-full min-w-0 items-center gap-2">
+          {category ? (
+            <span
+              className={`shrink-0 rounded-sm border px-1 py-px text-[9px] font-semibold uppercase leading-none tracking-[0.08em] ${sessionCategoryClass(category)}`}
+              title={`Session category: ${SESSION_CATEGORY_LABEL[category]}`}
+            >
+              {SESSION_CATEGORY_LABEL[category]}
+            </span>
+          ) : null}
           {gitLabel ? (
             <span
               className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden text-[11px] text-content/45"
@@ -2547,6 +2563,29 @@ function DiffStat({
 function formatGitLabel(repo?: string, branch?: string): string {
   if (repo && branch) return `${repo}/${branch}`;
   return branch || repo || "";
+}
+
+function sessionCategoryClass(category: SessionCategory): string {
+  switch (category) {
+    case "code-review":
+      return "border-amber-400/25 bg-amber-400/10 text-amber-300/80";
+    case "investigation":
+      return "border-cyan-400/25 bg-cyan-400/10 text-cyan-300/80";
+    case "planning":
+      return "border-violet-400/25 bg-violet-400/10 text-violet-300/80";
+    case "bug-fix":
+      return "border-rose-400/25 bg-rose-400/10 text-rose-300/80";
+    case "new-feature":
+      return "border-emerald-400/25 bg-emerald-400/10 text-emerald-300/80";
+    case "refactor":
+      return "border-blue-400/25 bg-blue-400/10 text-blue-300/80";
+    case "docs":
+      return "border-sky-400/25 bg-sky-400/10 text-sky-300/80";
+    case "maintenance":
+      return "border-content/15 bg-content/5 text-content/55";
+    case "other":
+      return "border-content/15 bg-content/5 text-content/55";
+  }
 }
 
 function formatRelative(value: number, now: number): string {
