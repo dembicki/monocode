@@ -97,7 +97,11 @@ export function inferSessionCategory(
   if (intent === "plan") return "planning";
   const text = message.toLowerCase();
   const matches = (pattern: RegExp) => pattern.test(text);
-  if (matches(/\b(code review|review (?:this|the|my|a )?(?:pr|pull request|diff|change|code)|audit (?:this|the|my|a )?(?:pr|diff|change|code))\b/)) {
+  if (
+    matches(
+      /\b(code review|review(?: this| the| my| a| these)? (?:session )?(?:pr|pull request|diff|changes?|code)|audit(?: this| the| my| a| these)? (?:session )?(?:pr|diff|changes?|code))\b/,
+    )
+  ) {
     return "code-review";
   }
   if (matches(/\b(fix(?:es|ed|ing)?|bug|broken|regression|crash|error|failure)\b/)) {
@@ -157,6 +161,39 @@ export function sessionCategoryForTurn(input: {
   }
 
   return input.current;
+}
+
+/** Rebuild a durable category for an older session from its stored history. */
+export function inferSessionCategoryFromHistory(
+  title: string,
+  userMessages: readonly string[],
+): SessionCategory {
+  let category: SessionCategory = "other";
+
+  for (const message of userMessages) {
+    const inferred = inferSessionCategory(message);
+    if (inferred === "other") continue;
+    if (
+      category === "other" ||
+      ((category === "investigation" || category === "planning") &&
+        inferred !== "investigation" &&
+        inferred !== "planning")
+    ) {
+      category = inferred;
+    }
+  }
+
+  const titleCategory = inferSessionCategory(title);
+  if (
+    category === "other" ||
+    ((category === "investigation" || category === "planning") &&
+      titleCategory !== "other" &&
+      titleCategory !== "investigation" &&
+      titleCategory !== "planning")
+  ) {
+    return titleCategory;
+  }
+  return category;
 }
 
 export type PlanStatus = "streaming" | "ready" | "building" | "built";

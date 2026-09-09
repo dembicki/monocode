@@ -188,6 +188,7 @@ type Props = {
     edge: PaneEdge,
   ) => void;
   onRenameSession?: (sessionId: string, title: string) => void;
+  onRefreshSessionCategories?: (sessionIds: readonly string[]) => void;
   onArchiveSession?: (sessionId: string, archived: boolean) => void;
   onArchiveSessions?: (
     sessionIds: readonly string[],
@@ -265,6 +266,7 @@ function SidebarComponent({
   onPrefetchSession,
   onPlaceSessionOnPane,
   onRenameSession,
+  onRefreshSessionCategories,
   onArchiveSession,
   onArchiveSessions,
   onPinSession,
@@ -687,6 +689,17 @@ function SidebarComponent({
           },
         ]
       : []),
+    ...(onRefreshSessionCategories
+      ? [
+          {
+            kind: "item" as const,
+            id: "refresh-category",
+            label: multipleMenuSessions
+              ? "Refresh categories"
+              : "Refresh category",
+          },
+        ]
+      : []),
     { kind: "sep" as const },
     { kind: "item" as const, id: "folder-new", label: "New folder" },
     ...(sessionFolders.length > 0 ? [{ kind: "sep" as const }] : []),
@@ -791,6 +804,10 @@ function SidebarComponent({
     }
     if (id === "rename") {
       setRenamingSessionId(sessionId);
+      return;
+    }
+    if (id === "refresh-category") {
+      onRefreshSessionCategories?.(sessionIds);
       return;
     }
     if (id === "folder-new") {

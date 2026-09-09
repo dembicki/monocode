@@ -243,6 +243,7 @@ import {
   HARNESS_TITLE,
   canReplaceSessionTitle,
   formatSessionTitle,
+  inferSessionCategoryFromHistory,
   sessionCategoryForTurn,
   sessionNeedsInput,
   newDefaultSession,
@@ -2747,6 +2748,51 @@ export default function App({
     [persistSession, refreshHistory, sidebarCwd],
   );
 
+  const onRefreshHistorySessionCategories = useCallback(
+    async (sessionIds: readonly string[]) => {
+      const refreshOne = async (sessionId: string) => {
+        const open = sessionsRef.current.find(
+          (session) => session.id === sessionId,
+        );
+        const restored = open ?? (await getSession(sessionId));
+        if (!restored) throw new Error("Session could not be loaded.");
+
+        const category = inferSessionCategoryFromHistory(
+          sessionDisplayTitle(restored.title, restored.harness),
+          restored.blocks
+            .filter((block) => block.role === "user")
+            .map((block) => block.text),
+        );
+        const updated = { ...restored, category };
+        if (open) {
+          setSessions((current) =>
+            current.map((session) =>
+              session.id === sessionId ? updated : session,
+            ),
+          );
+        }
+
+        const summary = await upsertSession(updated);
+        if (!summary) throw new Error("Session could not be saved.");
+        lastPersisted.current.set(sessionId, persistFingerprint(updated));
+        setHistory((current) =>
+          mergeProjectHistorySummary(current, summary),
+        );
+      };
+
+      try {
+        await Promise.all(sessionIds.map(refreshOne));
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        void message(`Could not refresh the session category.\n\n${detail}`, {
+          title: "MonoCode",
+          kind: "error",
+        });
+      }
+    },
+    [],
+  );
+
   const onRemoveHistorySession = useCallback(
     async (
       sessionId: string,
@@ -5023,6 +5069,13 @@ export default function App({
       ...(focusedSessionId
         ? [
             {
+              id: "refresh_session_category",
+              label: "Refresh category",
+              run: () => {
+                void onRefreshHistorySessionCategories([focusedSessionId]);
+              },
+            },
+            {
               id: "archive_session",
               label: "Archive Current Session",
               shortcut: `${MOD}⇧A`,
@@ -5530,6 +5583,7 @@ export default function App({
         onSessionNavigationOrder={onSessionNavigationOrder}
         onPlaceSessionOnPane={onPlaceSessionOnPane}
         onRenameSession={onRenameHistorySession}
+        onRefreshSessionCategories={onRefreshHistorySessionCategories}
         onArchiveSession={onArchiveHistorySession}
         onArchiveSessions={onArchiveHistorySessions}
         onPinSession={onPinHistorySession}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   inferSessionCategory,
+  inferSessionCategoryFromHistory,
   sessionCategoryForTurn,
 } from "./session";
 import {
@@ -62,5 +63,20 @@ describe("session metadata", () => {
         message: "Also add a regression test",
       }),
     ).toBe("bug-fix");
+  });
+
+  it("rebuilds an existing session category from its stored conversation", () => {
+    expect(
+      inferSessionCategoryFromHistory("Startup issue", [
+        "Investigate why startup is slow",
+        "Please fix the startup race now",
+        "Also add a regression test",
+      ]),
+    ).toBe("bug-fix");
+    expect(
+      inferSessionCategoryFromHistory("Review session changes", [
+        "Can you take a look at this?",
+      ]),
+    ).toBe("code-review");
   });
 });
