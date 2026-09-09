@@ -60,6 +60,89 @@ type CgsConnection = usize;
 type SetBlurFn = unsafe extern "C" fn(CgsConnection, c_int, c_int) -> c_int;
 type ConnectionFn = unsafe extern "C" fn() -> CgsConnection;
 
+pub fn start_local_install() -> Result<String, String> {
+    use std::fs::{self, OpenOptions};
+    use std::io::Write;
+    use std::os::unix::process::CommandExt;
+    use std::process::{Command, Stdio};
+
+    let source_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .ok_or("MonoCode source checkout could not be located")?;
+    let install_script = source_dir.join("scripts/install-macos-app.sh");
+    if !source_dir.join("package.json").is_file() || !install_script.is_file() {
+        return Err(format!(
+            "MonoCode source checkout is unavailable at {}",
+            source_dir.display()
+        ));
+    }
+
+    let target_dir = source_dir.join("target");
+    fs::create_dir_all(&target_dir).map_err(|error| error.to_string())?;
+    let log_path = target_dir.join("install-macos-app.log");
+    let mut log = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open(&log_path)
+        .map_err(|error| error.to_string())?;
+    writeln!(log, "$ git fetch origin main").map_err(|error| error.to_string())?;
+    let fetch_log = log.try_clone().map_err(|error| error.to_string())?;
+    let fetch_error_log = log.try_clone().map_err(|error| error.to_string())?;
+    let fetch = Command::new("/usr/bin/git")
+        .args(["fetch", "origin", "main"])
+        .current_dir(source_dir)
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .stdin(Stdio::null())
+        .stdout(Stdio::from(fetch_log))
+        .stderr(Stdio::from(fetch_error_log))
+        .status()
+        .map_err(|error| format!("Could not fetch origin/main: {error}"))?;
+    if !fetch.success() {
+        return Err(format!(
+            "Could not fetch origin/main. Your files were left unchanged. See {}",
+            log_path.display()
+        ));
+    }
+
+    writeln!(log, "\n$ git merge --ff-only FETCH_HEAD").map_err(|error| error.to_string())?;
+    let merge_log = log.try_clone().map_err(|error| error.to_string())?;
+    let merge_error_log = log.try_clone().map_err(|error| error.to_string())?;
+    let merge = Command::new("/usr/bin/git")
+        .args(["merge", "--ff-only", "FETCH_HEAD"])
+        .current_dir(source_dir)
+        .stdin(Stdio::null())
+        .stdout(Stdio::from(merge_log))
+        .stderr(Stdio::from(merge_error_log))
+        .status()
+        .map_err(|error| format!("Could not fast-forward from origin/main: {error}"))?;
+    if !merge.success() {
+        return Err(format!(
+            "Could not fast-forward from origin/main. Your files were left unchanged. See {}",
+            log_path.display()
+        ));
+    }
+
+    writeln!(log, "\n$ npm run install:mac").map_err(|error| error.to_string())?;
+    let error_log = log.try_clone().map_err(|error| error.to_string())?;
+    let shell = crate::passwd_identity()
+        .map(|identity| identity.shell)
+        .filter(|shell| !shell.is_empty())
+        .unwrap_or_else(|| "/bin/zsh".into());
+
+    Command::new(shell)
+        .args(["-lic", "exec npm run install:mac"])
+        .current_dir(source_dir)
+        .process_group(0)
+        .stdin(Stdio::null())
+        .stdout(Stdio::from(log))
+        .stderr(Stdio::from(error_log))
+        .spawn()
+        .map_err(|error| format!("Could not start the local build: {error}"))?;
+
+    Ok(crate::fs::path_to_js(&log_path))
+}
+
 unsafe extern "C" {
     fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
 }

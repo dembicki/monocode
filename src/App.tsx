@@ -5136,6 +5136,26 @@ export default function App({
         shortcut: `${MOD},`,
         run: () => openSettings(),
       },
+      ...(IS_MAC
+        ? [
+            {
+              id: "install_local_build",
+              label: "Developer: Update to latest build",
+              confirm: {
+                confirmLabel: "Build and Reinstall",
+                describe: () =>
+                  "Fast-forward the source checkout from origin/main, build MonoCode, close all running instances, replace the app in /Applications, and restart it? Local work will not be overwritten.",
+                onConfirm: async () => {
+                  const logPath = await invoke<string>("start_local_install");
+                  await message(
+                    `The source is up to date and the release build is running in the background. MonoCode will close and reopen when installation finishes.\n\nBuild log: ${logPath}`,
+                    { title: "MonoCode build started" },
+                  );
+                },
+              },
+            },
+          ]
+        : []),
       ...(isGitRepo
         ? [
             {

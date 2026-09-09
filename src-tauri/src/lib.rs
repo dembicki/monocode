@@ -157,6 +157,18 @@ fn open_new_window(app: tauri::AppHandle) -> Result<(), String> {
     window::open_new_window(&app)
 }
 
+#[tauri::command]
+fn start_local_install() -> Result<String, String> {
+    #[cfg(target_os = "macos")]
+    {
+        return macos::start_local_install();
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Err("Local app installation is only supported on macOS.".into())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[cfg(windows)]
@@ -315,6 +327,7 @@ pub fn run() {
             set_window_background_blur,
             set_dock_badge,
             open_new_window,
+            start_local_install,
             window::hide_window,
             window::destroy_window,
             window::confirm_quit,

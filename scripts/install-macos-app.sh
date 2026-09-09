@@ -22,17 +22,30 @@ if [[ ! -d "$applications_dir" ]]; then
   exit 1
 fi
 
-if pgrep -x monocode >/dev/null 2>&1; then
-  osascript -e 'tell application id "com.monocode.desktop" to quit'
+running_pids=()
+while IFS= read -r pid; do
+  [[ -n "$pid" ]] && running_pids+=("$pid")
+done < <(
+  ps -axo pid=,command= | awk \
+    '$2 ~ /\/MonoCode\.app\/Contents\/MacOS\/monocode$/ { print $1 }'
+)
 
-  for _ in {1..50}; do
-    if ! pgrep -x monocode >/dev/null 2>&1; then
-      break
-    fi
+if (( ${#running_pids[@]} > 0 )); then
+  kill -TERM "${running_pids[@]}" 2>/dev/null || true
+
+  for _ in {1..100}; do
+    remaining=0
+    for pid in "${running_pids[@]}"; do
+      if kill -0 "$pid" 2>/dev/null; then
+        remaining=1
+        break
+      fi
+    done
+    (( remaining == 0 )) && break
     sleep 0.1
   done
 
-  if pgrep -x monocode >/dev/null 2>&1; then
+  if (( remaining != 0 )); then
     echo "MonoCode did not quit; close it and run the command again." >&2
     exit 1
   fi
@@ -43,6 +56,6 @@ if [[ -e "$installed_app" ]]; then
 fi
 
 /usr/bin/ditto "$source_app" "$installed_app"
-open "$installed_app"
+open -n "$installed_app"
 
 echo "Installed and opened $installed_app"
