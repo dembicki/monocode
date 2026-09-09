@@ -2338,7 +2338,7 @@ function SessionCard({
         }}
         onContextMenu={onContextMenu}
         onKeyDown={onKeyDown}
-        className={`relative border flex w-full touch-none flex-col rounded-md px-2.5 text-left ${
+        className={`relative flex min-w-0 w-full touch-none flex-col overflow-hidden rounded-md border px-2.5 text-left ${
           compact ? "py-1.5" : "py-2"
         } ${dragging ? "opacity-40" : ""} ${
           dropTarget
@@ -2385,11 +2385,14 @@ function SessionCard({
           </span>
           {compact ? status : null}
         </span>
-        <span className="relative mt-1 flex items-center gap-2">
+        <span className="relative mt-1 flex w-full min-w-0 items-center gap-2">
           {gitLabel ? (
-            <span className="flex min-w-0 flex-1 items-center gap-1 text-[11px] text-content/45">
+            <span
+              className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden text-[11px] text-content/45"
+              title={gitLabel}
+            >
               <GitBranch className="size-3 shrink-0" strokeWidth={1.75} />
-              <span className="min-w-0 truncate">{gitLabel}</span>
+              <span className="block min-w-0 flex-1 truncate">{gitLabel}</span>
             </span>
           ) : (
             <span className="min-w-0 flex-1" />
