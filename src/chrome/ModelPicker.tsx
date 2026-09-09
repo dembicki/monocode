@@ -45,6 +45,7 @@ import { useLockOverscroll } from "../hooks/useLockOverscroll";
 import { HarnessIcon } from "./HarnessIcon";
 import { Popover } from "./Popover";
 import { MOD } from "../lib/platform";
+import { navigateModelControl } from "./modelControlNavigation";
 
 type Props = {
   harness: HarnessId;
@@ -92,6 +93,8 @@ export function ModelPicker({
   const current = resolveModel(harness, model);
   const tabRef = useRef(tab);
   const openRef = useRef(open);
+  const activeRef = useRef(active);
+  const visibleRef = useRef<AgentModel[]>([]);
   const lastHotkey = useRef(0);
 
   const shownInPicker = (id: HarnessId) =>
@@ -107,6 +110,7 @@ export function ModelPicker({
   }
   tabRef.current = visibleTab;
   openRef.current = open;
+  activeRef.current = active;
 
   const dismiss = (restore: boolean) => {
     setOpen(false);
@@ -174,24 +178,71 @@ export function ModelPicker({
         return;
       }
       if (!openRef.current) return;
+      if (e.key === "Tab") {
+        const trigger = root.current?.querySelector<HTMLElement>(
+          "[data-model-control]",
+        );
+        if (navigateModelControl(trigger ?? null, e.shiftKey)) {
+          e.preventDefault();
+          e.stopPropagation();
+          dismiss(false);
+        }
+        return;
+      }
       if (e.key === "Escape") {
         e.preventDefault();
         e.stopPropagation();
         dismiss(true);
         return;
       }
-      if (mod || e.altKey || e.shiftKey) return;
-      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
       if (inBlockingUi(e.target)) return;
-      e.preventDefault();
-      e.stopPropagation();
-      selectTab(
-        stepModelPickerTab(
-          tabRef.current,
-          e.key === "ArrowLeft" ? -1 : 1,
-          shownInPicker,
-        ),
-      );
+      if (!mod && !e.altKey && !e.shiftKey) {
+        if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+          e.preventDefault();
+          e.stopPropagation();
+          selectTab(
+            stepModelPickerTab(
+              tabRef.current,
+              e.key === "ArrowLeft" ? -1 : 1,
+              shownInPicker,
+            ),
+          );
+          return;
+        }
+        if (
+          (e.key === "ArrowUp" || e.key === "ArrowDown") &&
+          e.target !== search.current
+        ) {
+          e.preventDefault();
+          e.stopPropagation();
+          search.current?.focus();
+          const last = visibleRef.current.length - 1;
+          const next =
+            last < 0
+              ? 0
+              : Math.max(
+                  0,
+                  Math.min(
+                    last,
+                    activeRef.current + (e.key === "ArrowUp" ? -1 : 1),
+                  ),
+                );
+          activeRef.current = next;
+          setActive(next);
+          return;
+        }
+      }
+      if (
+        !mod &&
+        !e.altKey &&
+        e.key.length === 1 &&
+        e.target !== search.current
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        search.current?.focus();
+        setQuery((value) => value + e.key);
+      }
     };
 
     const onMenu = () => {
@@ -209,7 +260,9 @@ export function ModelPicker({
   }, [hotkeys]);
 
   useEffect(() => {
-    if (open) search.current?.focus();
+    if (!open) return;
+    const frame = requestAnimationFrame(() => search.current?.focus());
+    return () => cancelAnimationFrame(frame);
   }, [open]);
 
   const visible = useMemo(() => {
@@ -239,6 +292,7 @@ export function ModelPicker({
     availabilityVersion,
     visibilityVersion,
   ]);
+  visibleRef.current = visible;
 
   useEffect(() => {
     if (!open) return;
@@ -302,6 +356,7 @@ export function ModelPicker({
         aria-keyshortcuts={`${MOD}.`}
         aria-expanded={open}
         aria-haspopup="dialog"
+        data-model-control
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => {
           if (open) {
@@ -310,7 +365,7 @@ export function ModelPicker({
           }
           openPicker();
         }}
-        className={`flex h-6.5 max-w-52 items-center gap-1 rounded-md px-1.5 ${
+        className={`flex h-6.5 max-w-52 items-center gap-1 rounded-md px-1.5 outline-none ${
           open
             ? "bg-content/10 text-content"
             : "bg-content/10 text-content hover:bg-content/15"

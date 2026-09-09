@@ -12,6 +12,7 @@ import {
   type RuntimeMode,
 } from "../lib/session";
 import { Popover } from "./Popover";
+import { navigateModelControl } from "./modelControlNavigation";
 
 type Props = {
   value: RuntimeMode;
@@ -44,27 +45,45 @@ export function AccessPicker({ value, onChange, onClose }: Props) {
   };
 
   useEffect(() => {
-    if (!open) return;
     setActive(Math.max(0, RUNTIME_MODES.indexOf(value)));
-  }, [open, value]);
+  }, [value]);
 
   const pick = (mode: RuntimeMode) => {
     onChange(mode);
     dismiss(true);
   };
 
-  const onMenuKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+  const onPickerKey = (e: ReactKeyboardEvent<HTMLElement>) => {
+    if (e.key === "Tab") {
+      const trigger = root.current?.querySelector<HTMLElement>(
+        "[data-model-control]",
+      );
+      if (navigateModelControl(trigger ?? null, e.shiftKey)) {
+        e.preventDefault();
+        dismiss(false);
+      }
+      return;
+    }
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActive((i) => Math.min(RUNTIME_MODES.length - 1, i + 1));
+      if (!open) setOpen(true);
+      setActive((i) =>
+        Math.min(
+          RUNTIME_MODES.length - 1,
+          open ? i + 1 : RUNTIME_MODES.indexOf(value) + 1,
+        ),
+      );
       return;
     }
     if (e.key === "ArrowUp") {
       e.preventDefault();
-      setActive((i) => Math.max(0, i - 1));
+      if (!open) setOpen(true);
+      setActive((i) =>
+        Math.max(0, open ? i - 1 : RUNTIME_MODES.indexOf(value) - 1),
+      );
       return;
     }
-    if (e.key === "Enter") {
+    if (e.key === "Enter" && open) {
       e.preventDefault();
       const mode = RUNTIME_MODES[active];
       if (mode) pick(mode);
@@ -79,7 +98,9 @@ export function AccessPicker({ value, onChange, onClose }: Props) {
         aria-label={RUNTIME_MODE_LABEL[value]}
         aria-expanded={open}
         aria-haspopup="listbox"
+        data-model-control
         onMouseDown={(e) => e.preventDefault()}
+        onKeyDown={onPickerKey}
         onClick={() => {
           if (open) {
             dismiss(true);
@@ -87,7 +108,7 @@ export function AccessPicker({ value, onChange, onClose }: Props) {
           }
           setOpen(true);
         }}
-        className={`flex h-6.5 max-w-52 items-center gap-1 rounded-md px-1.5 ${
+        className={`flex h-6.5 max-w-52 items-center gap-1 rounded-md px-1.5 outline-none ${
           open
             ? "bg-content/10 text-content"
             : "bg-content/10 text-content hover:bg-content/15"
@@ -113,7 +134,7 @@ export function AccessPicker({ value, onChange, onClose }: Props) {
           aria-label="Access"
           data-access-picker
           tabIndex={-1}
-          onKeyDown={onMenuKey}
+          onKeyDown={onPickerKey}
           className="p-1"
         >
           {RUNTIME_MODES.map((mode, index) => {

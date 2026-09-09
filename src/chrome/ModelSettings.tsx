@@ -14,6 +14,10 @@ import {
   type ModelSetting,
 } from "../lib/models";
 import type { HarnessId } from "../lib/session";
+import {
+  navigateModelControl,
+  toggleValueForArrow,
+} from "./modelControlNavigation";
 
 type Props = {
   harness: HarnessId;
@@ -90,7 +94,7 @@ function useSyncCatalog(): number {
   return version;
 }
 
-function ToggleSetting({
+export function ToggleSetting({
   setting,
   value,
   onChange,
@@ -108,9 +112,25 @@ function ToggleSetting({
       title={setting.description ?? setting.label}
       aria-label={setting.label}
       aria-pressed={on}
+      aria-keyshortcuts="ArrowUp ArrowDown"
+      data-model-control
       onMouseDown={(e) => e.preventDefault()}
+      onKeyDown={(e) => {
+        const arrowValue = toggleValueForArrow(e.key);
+        if (arrowValue != null) {
+          e.preventDefault();
+          onChange(arrowValue);
+          return;
+        }
+        if (
+          e.key === "Tab" &&
+          navigateModelControl(e.currentTarget, e.shiftKey)
+        ) {
+          e.preventDefault();
+        }
+      }}
       onClick={() => onChange(on ? "false" : "true")}
-      className={`flex h-6.5 items-center gap-1 rounded-md px-1.5 ${
+      className={`flex h-6.5 items-center gap-1 rounded-md px-1.5 outline-none ${
         on
           ? "bg-content/20 text-content"
           : "bg-content/10 text-content/50 hover:bg-content/15 hover:text-content"
@@ -122,7 +142,7 @@ function ToggleSetting({
   );
 }
 
-function SelectSetting({
+export function SelectSetting({
   setting,
   value,
   onChange,
@@ -154,32 +174,57 @@ function SelectSetting({
   };
 
   useEffect(() => {
-    if (!open) return;
     setActive(
       Math.max(
         0,
         setting.options.findIndex((option) => option.value === value),
       ),
     );
-  }, [open, setting.options, value]);
+  }, [setting.options, value]);
 
   const pick = (next: string) => {
     onChange(next);
     dismiss(true);
   };
 
-  const onMenuKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+  const onPickerKey = (e: ReactKeyboardEvent<HTMLElement>) => {
+    if (e.key === "Tab") {
+      const trigger = root.current?.querySelector<HTMLElement>(
+        "[data-model-control]",
+      );
+      if (navigateModelControl(trigger ?? null, e.shiftKey)) {
+        e.preventDefault();
+        dismiss(false);
+      }
+      return;
+    }
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActive((i) => Math.min(setting.options.length - 1, i + 1));
+      if (!open) setOpen(true);
+      setActive((i) =>
+        Math.min(
+          setting.options.length - 1,
+          open
+            ? i + 1
+            : setting.options.findIndex((option) => option.value === value) + 1,
+        ),
+      );
       return;
     }
     if (e.key === "ArrowUp") {
       e.preventDefault();
-      setActive((i) => Math.max(0, i - 1));
+      if (!open) setOpen(true);
+      setActive((i) =>
+        Math.max(
+          0,
+          open
+            ? i - 1
+            : setting.options.findIndex((option) => option.value === value) - 1,
+        ),
+      );
       return;
     }
-    if (e.key === "Enter") {
+    if (e.key === "Enter" && open) {
       e.preventDefault();
       const option = setting.options[active];
       if (option) pick(option.value);
@@ -194,7 +239,9 @@ function SelectSetting({
         aria-label={`${setting.label}: ${current?.label ?? value}`}
         aria-expanded={open}
         aria-haspopup="listbox"
+        data-model-control
         onMouseDown={(e) => e.preventDefault()}
+        onKeyDown={onPickerKey}
         onClick={() => {
           if (open) {
             dismiss(true);
@@ -202,7 +249,7 @@ function SelectSetting({
           }
           setOpen(true);
         }}
-        className={`flex h-6.5 max-w-36 items-center gap-1 rounded-md px-1.5 ${
+        className={`flex h-6.5 max-w-36 items-center gap-1 rounded-md px-1.5 outline-none ${
           open
             ? "bg-content/10 text-content"
             : "bg-content/10 text-content hover:bg-content/15"
@@ -228,7 +275,7 @@ function SelectSetting({
           aria-label={setting.label}
           data-model-settings
           tabIndex={-1}
-          onKeyDown={onMenuKey}
+          onKeyDown={onPickerKey}
           className="p-1"
         >
           {setting.options.map((option, index) => {
