@@ -241,6 +241,9 @@ import { runSessionRemoval } from "./lib/sessionRemoval";
 import {
   HARNESS_LABEL,
   HARNESS_TITLE,
+  SESSION_CATEGORIES,
+  SESSION_CATEGORY_LABEL,
+  asSessionCategory,
   canReplaceSessionTitle,
   formatSessionTitle,
   inferSessionCategoryFromHistory,
@@ -259,6 +262,7 @@ import {
   type PlanStatus,
   type SecondOpinionMeta,
   type Session,
+  type SessionCategory,
   type TurnIntent,
 } from "./lib/session";
 
@@ -2748,6 +2752,35 @@ export default function App({
     [persistSession, refreshHistory, sidebarCwd],
   );
 
+  const onSetHistorySessionCategory = useCallback(
+    async (
+      sessionId: string,
+      category: SessionCategory,
+      restoredSession?: Session,
+    ) => {
+      const open = sessionsRef.current.find(
+        (session) => session.id === sessionId,
+      );
+      const restored = restoredSession ?? open ?? (await getSession(sessionId));
+      if (!restored) throw new Error("Session could not be loaded.");
+
+      const updated = { ...restored, category };
+      if (open) {
+        setSessions((current) =>
+          current.map((session) =>
+            session.id === sessionId ? updated : session,
+          ),
+        );
+      }
+
+      const summary = await upsertSession(updated);
+      if (!summary) throw new Error("Session could not be saved.");
+      lastPersisted.current.set(sessionId, persistFingerprint(updated));
+      setHistory((current) => mergeProjectHistorySummary(current, summary));
+    },
+    [],
+  );
+
   const onRefreshHistorySessionCategories = useCallback(
     async (sessionIds: readonly string[]) => {
       const refreshOne = async (sessionId: string) => {
@@ -2763,21 +2796,7 @@ export default function App({
             .filter((block) => block.role === "user")
             .map((block) => block.text),
         );
-        const updated = { ...restored, category };
-        if (open) {
-          setSessions((current) =>
-            current.map((session) =>
-              session.id === sessionId ? updated : session,
-            ),
-          );
-        }
-
-        const summary = await upsertSession(updated);
-        if (!summary) throw new Error("Session could not be saved.");
-        lastPersisted.current.set(sessionId, persistFingerprint(updated));
-        setHistory((current) =>
-          mergeProjectHistorySummary(current, summary),
-        );
+        await onSetHistorySessionCategory(sessionId, category, restored);
       };
 
       try {
@@ -2790,7 +2809,7 @@ export default function App({
         });
       }
     },
-    [],
+    [onSetHistorySessionCategory],
   );
 
   const onRemoveHistorySession = useCallback(
@@ -5073,6 +5092,26 @@ export default function App({
               label: "Refresh category",
               run: () => {
                 void onRefreshHistorySessionCategories([focusedSessionId]);
+              },
+            },
+            {
+              id: "update_session_category",
+              label: "Update category…",
+              select: {
+                placeholder: "Choose a category",
+                selectedId: active?.category,
+                options: SESSION_CATEGORIES.map((category) => ({
+                  id: category,
+                  label: SESSION_CATEGORY_LABEL[category],
+                })),
+                onSelect: async (value: string) => {
+                  const category = asSessionCategory(value);
+                  if (!category) throw new Error("Unknown session category.");
+                  await onSetHistorySessionCategory(
+                    focusedSessionId,
+                    category,
+                  );
+                },
               },
             },
             {

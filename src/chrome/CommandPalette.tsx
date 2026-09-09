@@ -26,14 +26,42 @@ type ConfirmSpec = {
   onConfirm: () => Promise<void> | void;
 };
 
+type SelectSpec = {
+  placeholder?: string;
+  selectedId?: string;
+  options: readonly { id: string; label: string }[];
+  onSelect: (id: string) => Promise<void> | void;
+};
+
 export type PaletteCommand = {
   id: string;
   label: string;
   shortcut?: string;
 } & (
-  | { run: () => void; prompt?: undefined; confirm?: undefined }
-  | { run?: undefined; prompt: PromptSpec; confirm?: undefined }
-  | { run?: undefined; prompt?: undefined; confirm: ConfirmSpec }
+  | {
+      run: () => void;
+      prompt?: undefined;
+      confirm?: undefined;
+      select?: undefined;
+    }
+  | {
+      run?: undefined;
+      prompt: PromptSpec;
+      confirm?: undefined;
+      select?: undefined;
+    }
+  | {
+      run?: undefined;
+      prompt?: undefined;
+      confirm: ConfirmSpec;
+      select?: undefined;
+    }
+  | {
+      run?: undefined;
+      prompt?: undefined;
+      confirm?: undefined;
+      select: SelectSpec;
+    }
 );
 
 type RankedCommand = PaletteCommand & {
@@ -41,9 +69,15 @@ type RankedCommand = PaletteCommand & {
   positions: number[];
 };
 
+type RankedOption = SelectSpec["options"][number] & {
+  positions: number[];
+  selected?: boolean;
+};
+
 type Mode =
   | { kind: "list" }
   | { kind: "prompt"; command: RankedCommand & { prompt: PromptSpec } }
+  | { kind: "select"; command: RankedCommand & { select: SelectSpec } }
   | {
       kind: "confirm";
       command: RankedCommand & { confirm: ConfirmSpec };
@@ -90,6 +124,30 @@ export function CommandPalette({ open, commands, onClose }: Props) {
     return scored;
   }, [commands, query]);
 
+  const selectResults = useMemo<RankedOption[]>(() => {
+    if (mode.kind !== "select") return [];
+    const needle = value.trim();
+    const options = mode.command.select.options.flatMap((option) => {
+      const hit = needle ? fuzzyMatch(needle, option.label) : null;
+      if (needle && !hit) return [];
+      return [
+        {
+          ...option,
+          positions: hit?.positions ?? [],
+          selected: option.id === mode.command.select.selectedId,
+        },
+      ];
+    });
+    if (needle) {
+      options.sort((a, b) => {
+        const left = fuzzyMatch(needle, a.label)?.score ?? 0;
+        const right = fuzzyMatch(needle, b.label)?.score ?? 0;
+        return right - left;
+      });
+    }
+    return options;
+  }, [mode, value]);
+
   useEffect(() => {
     if (!open) return;
     setQuery("");
@@ -105,6 +163,15 @@ export function CommandPalette({ open, commands, onClose }: Props) {
       results.length === 0 ? 0 : Math.min(index, results.length - 1),
     );
   }, [results.length]);
+
+  useEffect(() => {
+    if (mode.kind !== "select") return;
+    setActive((index) =>
+      selectResults.length === 0
+        ? 0
+        : Math.min(index, selectResults.length - 1),
+    );
+  }, [mode.kind, selectResults.length]);
 
   useEffect(() => {
     if (!open) return;
@@ -138,8 +205,21 @@ export function CommandPalette({ open, commands, onClose }: Props) {
       return;
     }
     if (entry.prompt) {
-      setMode({ kind: "prompt", command: entry as typeof entry & { prompt: PromptSpec } });
+      setMode({
+        kind: "prompt",
+        command: entry as typeof entry & { prompt: PromptSpec },
+      });
       setValue("");
+      setError(null);
+      return;
+    }
+    if (entry.select) {
+      setMode({
+        kind: "select",
+        command: entry as typeof entry & { select: SelectSpec },
+      });
+      setValue("");
+      setActive(0);
       setError(null);
       return;
     }
@@ -196,6 +276,19 @@ export function CommandPalette({ open, commands, onClose }: Props) {
     }
   };
 
+  const submitSelect = async (option: RankedOption | undefined) => {
+    if (mode.kind !== "select" || !option || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await mode.command.select.onSelect(option.id);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setBusy(false);
+    }
+  };
+
   const onSearchKey = (e: ReactKeyboardEvent<HTMLInputElement>) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
@@ -219,11 +312,27 @@ export function CommandPalette({ open, commands, onClose }: Props) {
   };
 
   const onModeKey = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (mode.kind === "select" && e.key === "ArrowDown") {
+      e.preventDefault();
+      if (selectResults.length === 0) return;
+      setActive((index) => (index + 1) % selectResults.length);
+      return;
+    }
+    if (mode.kind === "select" && e.key === "ArrowUp") {
+      e.preventDefault();
+      if (selectResults.length === 0) return;
+      setActive(
+        (index) => (index - 1 + selectResults.length) % selectResults.length,
+      );
+      return;
+    }
     if (e.key === "Enter") {
       e.preventDefault();
       if (mode.kind === "prompt") void submitPrompt();
       else if (mode.kind === "confirm") void submitConfirm();
+      else if (mode.kind === "select") void submitSelect(selectResults[active]);
     }
+    if (mode.kind === "select" && e.key === "Tab") e.preventDefault();
   };
 
   const empty =
@@ -231,7 +340,10 @@ export function CommandPalette({ open, commands, onClose }: Props) {
 
   return createPortal(
     <div className="fixed inset-0" style={{ zIndex: LAYER.dialog }}>
-      <div className="absolute inset-0" onMouseDown={busy ? undefined : onClose} />
+      <div
+        className="absolute inset-0"
+        onMouseDown={busy ? undefined : onClose}
+      />
       <div
         role="dialog"
         aria-label="Command Palette"
@@ -281,6 +393,29 @@ export function CommandPalette({ open, commands, onClose }: Props) {
                 onChange={(e) => setValue(e.target.value)}
                 onKeyDown={onModeKey}
               />
+            ) : mode.kind === "select" ? (
+              <input
+                ref={search}
+                type="text"
+                value={value}
+                placeholder={
+                  mode.command.select.placeholder ?? "Choose an option"
+                }
+                aria-label={
+                  mode.command.select.placeholder ?? "Choose an option"
+                }
+                spellCheck={false}
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                disabled={busy}
+                className="min-w-0 flex-1 bg-transparent text-[13px] text-content outline-none placeholder:text-content/40 disabled:opacity-50"
+                onChange={(e) => {
+                  setValue(e.target.value);
+                  setActive(0);
+                }}
+                onKeyDown={onModeKey}
+              />
             ) : (
               <input
                 ref={search}
@@ -320,6 +455,21 @@ export function CommandPalette({ open, commands, onClose }: Props) {
               onPick={enterMode}
             />
           )
+        ) : mode.kind === "select" ? (
+          selectResults.length === 0 ? (
+            <p className="px-3 pb-3 pt-1 text-[12px] text-content/50">
+              No matching options
+            </p>
+          ) : (
+            <CommandList
+              entries={selectResults}
+              active={active}
+              query={value}
+              ariaLabel="Category options"
+              onActive={setActive}
+              onPick={(option) => void submitSelect(option)}
+            />
+          )
         ) : null}
       </div>
     </div>,
@@ -327,18 +477,28 @@ export function CommandPalette({ open, commands, onClose }: Props) {
   );
 }
 
-function CommandList({
+type CommandListEntry = {
+  id: string;
+  label: string;
+  shortcut?: string;
+  positions: number[];
+  selected?: boolean;
+};
+
+function CommandList<T extends CommandListEntry>({
   entries,
   active,
   query,
+  ariaLabel = "Commands",
   onActive,
   onPick,
 }: {
-  entries: RankedCommand[];
+  entries: T[];
   active: number;
   query: string;
+  ariaLabel?: string;
   onActive: (index: number) => void;
-  onPick: (entry: RankedCommand) => void;
+  onPick: (entry: T) => void;
 }) {
   const lockOverscroll = useLockOverscroll<HTMLDivElement>();
   const activeRef = useRef<HTMLButtonElement>(null);
@@ -375,7 +535,7 @@ function CommandList({
     <div
       ref={lockOverscroll}
       role="listbox"
-      aria-label="Commands"
+      aria-label={ariaLabel}
       onMouseMove={onListMouseMove}
       className="max-h-[min(380px,50vh)] overflow-y-auto overscroll-none px-1.5 pb-1.5"
     >
@@ -405,6 +565,11 @@ function CommandList({
             {entry.shortcut ? (
               <span className="min-w-0 shrink-0 truncate font-mono text-[11px] text-content/40">
                 {entry.shortcut}
+              </span>
+            ) : null}
+            {entry.selected ? (
+              <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-content/40">
+                Current
               </span>
             ) : null}
           </button>
