@@ -11,7 +11,7 @@ import { createPortal } from "react-dom";
 import { fuzzyMatch } from "../lib/fuzzy";
 import { LAYER } from "../lib/layers";
 import { projectKey, projectName } from "../lib/paths";
-import { projectSwitcherItems, type RecentProject } from "../lib/recents";
+import { projectPickerItems, type RecentProject } from "../lib/recents";
 import {
   loadTabGroupColors,
   loadTabGroupCustomColors,
@@ -104,7 +104,7 @@ export function ProjectSwitcher({
 
   const candidates = useMemo<Candidate[]>(
     () =>
-      projectSwitcherItems(recents, currentCwd).map((entry) => ({
+      projectPickerItems(recents, currentCwd).map((entry) => ({
         path: entry.path,
         name: projectName(entry.path),
       })),

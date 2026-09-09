@@ -113,7 +113,7 @@ import { useTabGroupLogos } from "../hooks/useTabGroupLogos";
 import { normalizeHex } from "../lib/colorUtils";
 import {
   looksLikeProject,
-  projectRailItems,
+  projectPickerItems,
   sameProjectPath,
   type RecentProject,
 } from "../lib/recents";
@@ -1583,11 +1583,7 @@ function SidebarProjectPicker({
   const label = resolveTabGroupLabel(key, groupLabels, basename(cwd) || seed);
   const logoPath = resolveTabGroupLogo(key, groupLogos);
   const color = resolveTabGroupColor(key, groupColors, groupCustomColors, seed);
-  const projects = projectRailItems(recents, cwd);
-  const orderedProjects = [
-    ...projects.filter((item) => sameProjectPath(item.path, cwd)),
-    ...projects.filter((item) => !sameProjectPath(item.path, cwd)),
-  ];
+  const orderedProjects = projectPickerItems(recents, cwd);
   const normalizedQuery = query.trim().toLocaleLowerCase();
   const filteredProjects = normalizedQuery
     ? orderedProjects.filter((item) => {

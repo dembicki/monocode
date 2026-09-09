@@ -315,19 +315,16 @@ export function projectRailItems(
   return [...pinned, ...unpinned];
 }
 
-/**
- * Projects for the switcher, most recently opened first and without the one
- * already open. The rail's order is spatial — pins first, then slots the user
- * dragged, with newcomers appended — so reusing it here buried a project the
- * user had just opened at the bottom of the list.
- */
-export function projectSwitcherItems(
+/** Projects shown by project pickers: current first, then the shared rail order. */
+export function projectPickerItems(
   recents: RecentProject[],
   currentCwd: string,
 ): RecentProject[] {
-  return projectRailItems(recents, currentCwd)
-    .filter((item) => !sameProjectPath(item.path, currentCwd))
-    .sort((a, b) => b.openedAt - a.openedAt);
+  const projects = projectRailItems(recents, currentCwd);
+  return [
+    ...projects.filter((item) => sameProjectPath(item.path, currentCwd)),
+    ...projects.filter((item) => !sameProjectPath(item.path, currentCwd)),
+  ];
 }
 
 /** True if this looks like a user project, not an app bundle or system root. */

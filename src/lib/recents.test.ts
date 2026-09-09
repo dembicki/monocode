@@ -9,7 +9,7 @@ import {
   looksLikeProject,
   projectRailItems,
   projectRailSections,
-  projectSwitcherItems,
+  projectPickerItems,
   rememberProject,
   savePinnedProjects,
   saveProjectRailOrder,
@@ -128,14 +128,12 @@ describe("projectRailItems", () => {
   });
 });
 
-describe("projectSwitcherItems", () => {
+describe("projectPickerItems", () => {
   beforeEach(() => {
     mockLocalStorage();
   });
 
-  it("puts a just-opened project first instead of last", () => {
-    // The rail appends newcomers, so a project the user just added sits in the
-    // last slot — off the bottom of the switcher once there are enough rows.
+  it("puts the current project first, then keeps the shared rail order", () => {
     const recents = [
       { path: "/tmp/brand-new", openedAt: 3 },
       { path: "/tmp/beta", openedAt: 2 },
@@ -144,11 +142,11 @@ describe("projectSwitcherItems", () => {
     saveProjectRailOrder(["/tmp/alpha", "/tmp/beta", "/tmp/brand-new"]);
 
     expect(
-      projectSwitcherItems(recents, "/tmp/alpha").map((item) => item.path),
-    ).toEqual(["/tmp/brand-new", "/tmp/beta"]);
+      projectPickerItems(recents, "/tmp/beta").map((item) => item.path),
+    ).toEqual(["/tmp/beta", "/tmp/alpha", "/tmp/brand-new"]);
   });
 
-  it("ranks by recency rather than by pins or rail slots", () => {
+  it("keeps pinned projects before unpinned projects after the current one", () => {
     const recents = [
       { path: "/tmp/beta", openedAt: 3 },
       { path: "/tmp/gamma", openedAt: 2 },
@@ -158,25 +156,15 @@ describe("projectSwitcherItems", () => {
     savePinnedProjects(["/tmp/gamma"]);
 
     expect(
-      projectSwitcherItems(recents, "/tmp/alpha").map((item) => item.path),
-    ).toEqual(["/tmp/beta", "/tmp/gamma"]);
+      projectPickerItems(recents, "/tmp/alpha").map((item) => item.path),
+    ).toEqual(["/tmp/alpha", "/tmp/gamma", "/tmp/beta"]);
   });
 
-  it("keeps rail order for projects opened at the same moment", () => {
-    const recents = [
-      { path: "/tmp/beta", openedAt: 7 },
-      { path: "/tmp/gamma", openedAt: 7 },
-    ];
-    saveProjectRailOrder(["/tmp/gamma", "/tmp/beta"]);
-
-    expect(
-      projectSwitcherItems(recents, "/tmp/alpha").map((item) => item.path),
-    ).toEqual(["/tmp/gamma", "/tmp/beta"]);
-  });
-
-  it("leaves out the project that is already open", () => {
+  it("includes the project that is already open", () => {
     const recents = rememberProject("/tmp/alpha");
-    expect(projectSwitcherItems(recents, "/tmp/alpha/")).toEqual([]);
+    expect(projectPickerItems(recents, "/tmp/alpha/")).toEqual([
+      expect.objectContaining({ path: "/tmp/alpha" }),
+    ]);
   });
 });
 
