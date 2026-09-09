@@ -54,6 +54,7 @@ import {
   type GitDiffIndex,
   type GitFileDiffKind,
   type GitHistoryCommit,
+  type GitPr,
 } from "../lib/fs";
 import type { HarnessId } from "../lib/session";
 import {
