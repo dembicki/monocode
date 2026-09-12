@@ -115,6 +115,15 @@ html.theme-light .sidebar-glass {
   background: var(--color-background-base);
 }
 
+/* Linux WebKit does not provide the native glass treatment used by the
+   switchers. Keep keyboard palettes opaque instead of showing the app below. */
+html:not(.has-native-glass) [data-session-switcher],
+html:not(.has-native-glass) [data-command-palette] {
+  background: var(--color-background-base);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
 .chat-pane-background::before {
   content: "";
   position: absolute;

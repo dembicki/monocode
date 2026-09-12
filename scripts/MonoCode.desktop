@@ -1,0 +1,9 @@
+[Desktop Entry]
+Categories=Development;
+Comment=MonoCode — one UI for every agent harness
+Exec=monocode
+StartupWMClass=monocode
+Icon=monocode
+Name=MonoCode
+Terminal=false
+Type=Application

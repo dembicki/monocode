@@ -1,8 +1,14 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Copy, Minus, Square, X } from "./icons";
 import { useEffect, useState } from "react";
+import { IS_WIN } from "../lib/platform";
 
 export function WindowControls() {
+  if (!IS_WIN) return null;
+  return <WindowsWindowControls />;
+}
+
+function WindowsWindowControls() {
   const [isMaximized, setIsMaximized] = useState(false);
 
   useEffect(() => {

@@ -64,6 +64,19 @@ npm run build:linux
 The Linux build emits `.deb` and AppImage bundles under `target/release/bundle/`.
 Tauri loads `src-tauri/tauri.linux.conf.json` automatically for Linux development and builds.
 
+### Arch Linux / Omarchy local install
+
+On Arch-based systems, build and install the current checkout for the local user:
+
+```bash
+npm run build:arch
+```
+
+This installs the native release binary and desktop entry under `~/.local`. It intentionally
+skips linuxdeploy, whose bundled tooling is incompatible with newer Arch ELF sections. The
+installed launcher also disables WebKitGTK's DMA-BUF renderer to avoid a Wayland explicit-sync
+protocol error seen on current Omarchy graphics stacks.
+
 ### Windows packages
 
 ```bash

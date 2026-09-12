@@ -36,7 +36,7 @@ import {
   saveProjectRailOpen,
   type SidebarTabId,
 } from "./lib/appearance";
-import { HAS_NATIVE_GLASS, IS_MAC } from "./lib/platform";
+import { HAS_NATIVE_GLASS, IS_MAC, IS_WIN } from "./lib/platform";
 import {
   applyUiScale,
   loadUiScale,
@@ -5724,7 +5724,7 @@ export default function App({
             undefined
           }
         >
-          {!IS_MAC ? (
+          {IS_WIN ? (
             <MenuBar
               onNew={onNew}
               onNewTerminal={onNewTerminal}
